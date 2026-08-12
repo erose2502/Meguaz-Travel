@@ -38,9 +38,9 @@ export function tier0(text: string): { tool: string; hint: string } | null {
 
 export async function runChat(
   messages: ChatMessage[],
-  sessionId: string
+  callerKey: string
 ): Promise<OrchestratorResult> {
-  if (overBudget(sessionId)) {
+  if (await overBudget(callerKey)) {
     return { reply: BUDGET_EXHAUSTED_REPLY, toolResults: [] };
   }
 
@@ -53,7 +53,7 @@ export async function runChat(
     ...trimmed,
   ];
 
-  const first = await complete(chatMessages, env.chatModel, sessionId);
+  const first = await complete(chatMessages, env.chatModel, callerKey);
   const choice = first.choices[0];
   const toolCalls = choice?.message?.tool_calls ?? [];
 
@@ -82,7 +82,7 @@ export async function runChat(
     });
   }
 
-  const second = await complete(chatMessages, env.chatModel, sessionId);
+  const second = await complete(chatMessages, env.chatModel, callerKey);
   return {
     reply: second.choices[0]?.message?.content ?? "",
     toolResults,
@@ -92,7 +92,7 @@ export async function runChat(
 async function complete(
   msgs: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
   model: string,
-  sessionId: string
+  callerKey: string
 ) {
   try {
     const res = await openai().chat.completions.create({
@@ -100,12 +100,12 @@ async function complete(
       messages: msgs,
       tools: toolDefinitions,
     });
-    recordUsage(sessionId, res.usage?.total_tokens ?? 0);
+    await recordUsage(callerKey, res.usage?.total_tokens ?? 0);
     return res;
   } catch (err) {
     // Single escalation to the fallback (mini-tier) model, then give up loudly.
     if (model !== env.fallbackModel) {
-      return complete(msgs, env.fallbackModel, sessionId);
+      return complete(msgs, env.fallbackModel, callerKey);
     }
     throw err;
   }

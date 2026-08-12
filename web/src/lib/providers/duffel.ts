@@ -157,7 +157,7 @@ export async function searchResorts(params: StaySearchParams): Promise<ResortRes
     body: JSON.stringify({ data: body }),
   });
   if (!res.ok) {
-    throw new Error(`Duffel Stays search failed (${res.status}): ${await res.text()}`);
+    throw new Error(`Duffel Stays search failed (${res.status})`);
   }
   const json = await res.json();
   const results = json?.data?.results ?? [];

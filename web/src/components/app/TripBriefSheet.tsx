@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin, NavigationArrow, CalendarBlank, Wallet, X, ArrowRight } from "@phosphor-icons/react";
+import { MapPin, NavigationArrow, CalendarBlank, Wallet, X, ArrowRight, Crosshair, CheckCircle } from "@phosphor-icons/react";
 import LottiePlayer from "./LottiePlayer";
+import { useGeolocation } from "@/lib/useGeolocation";
 import type { SolveResponse } from "@/lib/plan-types";
 
 interface TripBriefSheetProps {
@@ -20,6 +21,7 @@ export default function TripBriefSheet({ open, onClose, onSolved }: TripBriefShe
   const [budget, setBudget] = useState(900);
   const [solving, setSolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { state: geoState, coords, locate } = useGeolocation();
 
   useEffect(() => {
     const home = localStorage.getItem("meguaz_home_base");
@@ -38,7 +40,15 @@ export default function TripBriefSheet({ open, onClose, onSolved }: TripBriefShe
       const res = await fetch("/api/plan/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, arriveBy, budget, adults: 1 }),
+        body: JSON.stringify({
+          from,
+          to,
+          arriveBy,
+          budget,
+          adults: 1,
+          // Real position sharpens "leave home by"; omitted if not shared.
+          originCoords: coords ? { lat: coords.lat, lng: coords.lng } : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -110,7 +120,32 @@ export default function TripBriefSheet({ open, onClose, onSolved }: TripBriefShe
                   placeholder="San Francisco"
                 />
               </div>
+              {geoState === "granted" && coords ? (
+                <span className="flex items-center gap-1 text-[#2FB4B4] text-[11px] font-semibold">
+                  <CheckCircle size={14} weight="fill" /> Located
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => locate()}
+                  disabled={geoState === "locating"}
+                  className="flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold text-[#146C7E]"
+                  style={{ background: "rgba(20,108,126,0.1)" }}
+                >
+                  <Crosshair size={13} weight="bold" />
+                  {geoState === "locating" ? "Locating…" : "Use my location"}
+                </button>
+              )}
             </div>
+
+            {/* Location sharpens the leave-home-by time to a real drive ETA. */}
+            <p className="text-[#0D1B2A]/40 text-[11px] px-1 -mt-1">
+              {geoState === "granted"
+                ? "Using your live location for an accurate leave-home-by time."
+                : geoState === "denied"
+                  ? "Location off — we'll estimate the drive from your city instead."
+                  : "Share your location for a precise leave-home-by time."}
+            </p>
 
             <div className={fieldShell}>
               <NavigationArrow size={18} color="#FF7A00" weight="regular" />

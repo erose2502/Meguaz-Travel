@@ -27,7 +27,7 @@ export type AirbnbResult = {
 
 export async function searchAirbnb(params: AirbnbSearchParams): Promise<AirbnbResult[]> {
   const cacheKey = `airbnb:${params.location}:${params.checkIn}:${params.checkOut}:${params.adults}`;
-  const cached = cacheGet<AirbnbResult[]>(cacheKey);
+  const cached = await cacheGet<AirbnbResult[]>(cacheKey);
   if (cached) return cached;
 
   const qs = new URLSearchParams({
@@ -39,9 +39,10 @@ export async function searchAirbnb(params: AirbnbSearchParams): Promise<AirbnbRe
     adults: String(params.adults),
   });
 
+  // Key travels in the query string, so never log or rethrow the URL/body.
   const res = await fetch(`${SEARCHAPI_BASE}?${qs}`);
   if (!res.ok) {
-    throw new Error(`SearchApi Airbnb search failed (${res.status}): ${await res.text()}`);
+    throw new Error(`SearchApi Airbnb search failed (${res.status})`);
   }
   const json = await res.json();
   // SearchApi result shape can shift; normalize defensively.

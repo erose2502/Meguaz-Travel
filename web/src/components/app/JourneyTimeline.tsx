@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { useGeolocation } from '@/lib/useGeolocation'
 import {
   ArrowLeft,
   House,
@@ -16,6 +17,8 @@ import {
   Wallet,
   Timer,
   LockKey,
+  Crosshair,
+  ArrowClockwise,
 } from '@phosphor-icons/react'
 
 import type { PlanOption, StepIcon } from '@/lib/plan-types'
@@ -34,6 +37,13 @@ const stepIconMap: Record<StepIcon, typeof House> = {
   buffer: ForkKnife,
   door: Door,
   train: Train,
+}
+
+function timeAgo(ts: number): string {
+  const secs = Math.round((Date.now() - ts) / 1000)
+  if (secs < 60) return 'just now'
+  const mins = Math.round(secs / 60)
+  return `${mins} min ago`
 }
 
 const costBreakdown = [
@@ -91,13 +101,31 @@ interface JourneyTimelineProps {
   option?: PlanOption | null
   budget?: number
   routeLabel?: string
+  originCoords?: { lat: number; lng: number } | null
   onBack: () => void
   onBook: () => void
   isMobile: boolean
 }
 
-export default function JourneyTimeline({ option, budget, onBack, onBook }: JourneyTimelineProps) {
+// Live drive-ETA state for the "Leave home by" card.
+type LiveEta = {
+  leaveBy: string
+  driveMin: number
+  trafficAware: boolean
+  checkedAt: number
+}
+
+export default function JourneyTimeline({
+  option,
+  budget,
+  originCoords,
+  onBack,
+  onBook,
+}: JourneyTimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const { coords, locate } = useGeolocation()
+  const [live, setLive] = useState<LiveEta | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   // Live plan when an option was selected; the prototype's demo plan otherwise.
   const budgetCap = budget ?? BUDGET_CAP
@@ -109,8 +137,56 @@ export default function JourneyTimeline({ option, budget, onBack, onBook }: Jour
     : steps
   const bufferMin = option?.bufferMin ?? 70
   const doorToDoor = option?.doorToDoor ?? '12h 40m'
-  const leaveBy = option?.leaveBy ?? '08:15'
   const underBudget = budgetCap - totalCost
+
+  // The live value wins once we have it, else the solver's baked-in time.
+  const leaveBy = live?.leaveBy ?? option?.leaveBy ?? '08:15'
+  const canLiveEta = Boolean(option?.originAirport && option?.departAt)
+
+  // Re-price the drive from the user's current position and shift leave-by.
+  const refreshEta = useCallback(
+    async (from: { lat: number; lng: number }) => {
+      if (!option?.originAirport || !option?.departAt) return
+      setRefreshing(true)
+      try {
+        const res = await fetch('/api/location/eta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from, airport: option.originAirport, departAt: option.departAt }),
+        })
+        if (!res.ok) return
+        const eta = await res.json()
+        const departMs = Date.parse(option.departAt)
+        const leaveMs = departMs - (eta.minutes + option.preTransferMin) * 60_000
+        const leaveByStr = new Date(leaveMs).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        })
+        setLive({
+          leaveBy: leaveByStr,
+          driveMin: eta.minutes,
+          trafficAware: eta.trafficAware,
+          checkedAt: Date.now(),
+        })
+      } finally {
+        setRefreshing(false)
+      }
+    },
+    [option]
+  )
+
+  // Auto-refresh once on open when we already have the traveler's location
+  // (from the brief), so the plan opens with a current leave-by.
+  useEffect(() => {
+    const start = originCoords ?? coords
+    if (canLiveEta && start) void refreshEta(start)
+  }, [canLiveEta, originCoords, coords, refreshEta])
+
+  async function handleManualRefresh() {
+    const from = originCoords ?? coords ?? (await locate())
+    if (from) void refreshEta(from)
+  }
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -192,10 +268,33 @@ export default function JourneyTimeline({ option, budget, onBack, onBook }: Jour
                 <p className="text-[#0D1B2A]/50 text-[11px] uppercase tracking-wide">Leave home by</p>
                 <p className="font-display text-[#FF7A00] text-2xl leading-none">{leaveBy}</p>
               </div>
-              <Clock size={30} color="#FF7A00" weight="light" />
+              {canLiveEta ? (
+                <button
+                  onClick={handleManualRefresh}
+                  disabled={refreshing}
+                  aria-label="Refresh leave-home-by from your location"
+                  className="flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-semibold text-[#FF7A00] active:scale-95 transition-transform"
+                  style={{ background: 'rgba(255,122,0,0.15)' }}
+                >
+                  {live ? (
+                    <ArrowClockwise size={14} weight="bold" className={refreshing ? 'animate-spin' : ''} />
+                  ) : (
+                    <Crosshair size={14} weight="bold" />
+                  )}
+                  {refreshing ? 'Checking…' : live ? 'Refresh' : 'Use my location'}
+                </button>
+              ) : (
+                <Clock size={30} color="#FF7A00" weight="light" />
+              )}
             </div>
             <p className="text-[#0D1B2A]/50 text-xs mt-2.5 leading-relaxed">
-              We watch traffic, security lines, and delays live — and move this time if anything shifts.
+              {live
+                ? `${live.driveMin}-min drive ${live.trafficAware ? 'with live traffic' : 'from your location'} · updated ${timeAgo(live.checkedAt)}. Reopen or refresh before you leave.`
+                : option?.etaTrafficAware
+                  ? 'Timed from your location with live traffic — refresh before you head out.'
+                  : option?.etaFromLocation
+                    ? 'Timed from your current location — sharpens as you get closer.'
+                    : 'Share your location for a live, traffic-aware leave-home-by time.'}
             </p>
           </div>
         </div>

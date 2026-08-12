@@ -1,0 +1,55 @@
+# Meguaz voice stack — self-hosted on a single EC2 instance.
+#
+#   caddy   → terminates TLS, reverse-proxies wss://<domain> to the LiveKit server
+#   livekit → the open-source SFU (replaces LiveKit Cloud; no usage quota)
+#   agent   → the Meguaz voice agent worker, connecting to livekit over the
+#             internal network
+#
+# All three read shared secrets from .env in this directory (copy .env.example).
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    network_mode: host # Caddy needs the host network to issue TLS on :80/:443
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - MEGUAZ_DOMAIN=${MEGUAZ_DOMAIN}
+
+  livekit:
+    image: livekit/livekit-server:v1.8
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    network_mode: host # WebRTC needs direct UDP; host networking is simplest on one box
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    environment:
+      # LiveKit reads keys from this env var as "key: secret" (note the space);
+      # it overrides the keys block in the config file.
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+
+  agent:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: python main.py start
+    environment:
+      # Inside the box the agent reaches LiveKit directly on localhost:7880.
+      - LIVEKIT_URL=ws://127.0.0.1:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_CHAT_MODEL=${OPENAI_CHAT_MODEL:-gpt-5-nano}
+      # The public URL of your deployed Next.js app — the agent calls its search
+      # APIs for flights/stays/ground. Must be reachable from EC2.
+      - MEGUAZ_API_BASE=${MEGUAZ_API_BASE}
+    network_mode: host
+    depends_on:
+      - livekit
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -17,6 +17,9 @@ export type TripBrief = {
   arriveBy: string; // YYYY-MM-DD
   budget: number; // USD cap
   adults: number;
+  // When present, the solver uses a real drive ETA from here to the departure
+  // airport instead of a static estimate, sharpening "leave home by".
+  originCoords?: { lat: number; lng: number };
 };
 
 export type PlanLeg = { type: LegType; label: string; time: string };
@@ -51,10 +54,21 @@ export type PlanOption = {
   steps: TimelineStep[];
   costBreakdown: CostLine[];
   offerId: string | null; // Duffel offer backing the flight leg
+  /** True when leave-by used a real drive ETA from the user's location. */
+  etaFromLocation: boolean;
+  etaTrafficAware: boolean;
+  // Fields that let the Journey timeline recompute leave-by from a fresh ETA:
+  originAirport: string; // departure IATA, e.g. "SFO"
+  departAt: string; // ISO datetime of the flight departure
+  // Everything before boarding except the drive (check-in + security + buffer),
+  // so live leave-by = departAt − (liveDriveMin + preTransferMin).
+  preTransferMin: number;
 };
 
 export type SolveResponse = {
   brief: TripBrief;
   routeLabel: string; // "San Francisco → London"
+  /** False when no itinerary lands before the arrive-by deadline; UI warns. */
+  meetsDeadline: boolean;
   options: PlanOption[];
 };

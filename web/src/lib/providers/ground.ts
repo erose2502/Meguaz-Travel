@@ -32,7 +32,7 @@ Max 6 options, most practical first. Official operator booking URLs only.`;
 export async function searchGround(params: GroundSearchParams): Promise<GroundOption[]> {
   const monthBucket = params.date.slice(0, 7);
   const cacheKey = `ground:${params.origin}:${params.destination}:${monthBucket}`.toLowerCase();
-  const cached = cacheGet<GroundOption[]>(cacheKey);
+  const cached = await cacheGet<GroundOption[]>(cacheKey);
   if (cached) return cached;
 
   const res = await fetch("https://api.perplexity.ai/chat/completions", {
@@ -55,12 +55,13 @@ export async function searchGround(params: GroundSearchParams): Promise<GroundOp
     }),
   });
   if (!res.ok) {
-    throw new Error(`Perplexity ground search failed (${res.status}): ${await res.text()}`);
+    // Status only — upstream bodies can echo request context into our logs.
+    throw new Error(`Perplexity ground search failed (${res.status})`);
   }
   const json = await res.json();
   const content: string = json.choices?.[0]?.message?.content ?? "{}";
   const options = parseOptions(content);
-  cacheSet(cacheKey, options, 24 * HOURS);
+  await cacheSet(cacheKey, options, 24 * HOURS);
   return options;
 }
 

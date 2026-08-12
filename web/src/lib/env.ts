@@ -1,4 +1,7 @@
-// Server-only environment access. Never import this from a client component.
+// Server-only environment access. The `server-only` import turns an accidental
+// client import into a build error instead of a leaked key at runtime.
+import "server-only";
+
 function required(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Missing required env var: ${name}`);

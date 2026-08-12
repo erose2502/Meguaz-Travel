@@ -15,6 +15,7 @@ import {
   Timer,
   ArrowRight,
   Check,
+  Warning,
 } from '@phosphor-icons/react'
 
 type Priority = 'money' | 'balanced' | 'time'
@@ -209,6 +210,20 @@ export default function SearchResults({ solved, onSelect, onBack }: SearchResult
             })}
           </div>
         </div>
+
+        {/* Nothing lands before the arrive-by deadline — say so rather than
+            quietly showing routes that miss it. */}
+        {solved && !solved.meetsDeadline && (
+          <div className="rounded-2xl px-4 py-3 flex items-start gap-3 mt-4" style={{ background: 'rgba(255,122,0,0.1)', border: '1px solid rgba(255,122,0,0.3)' }}>
+            <Warning size={18} color="#FF7A00" weight="fill" className="mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-[#0D1B2A] text-xs font-semibold">These arrive after your deadline</p>
+              <p className="text-[#0D1B2A]/55 text-xs">
+                Nothing we found lands by {arriveByLabel}. Try an earlier arrive-by date, or take the closest option below.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Options */}
         <div className="flex items-center justify-between mt-8 mb-4">

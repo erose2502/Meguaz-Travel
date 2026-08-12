@@ -1,4 +1,6 @@
 import { searchFlights, resolveIata, type FlightOffer } from "@/lib/providers/duffel";
+import { airportCoords } from "@/lib/providers/geo";
+import { driveEta } from "@/lib/providers/routing";
 import type {
   TripBrief,
   PlanOption,
@@ -36,44 +38,106 @@ export async function solveTrip(brief: TripBrief): Promise<SolveResponse | null>
   ]);
   if (!origin || !destination) return null;
 
-  const offers = await searchFlights({
-    origin,
-    destination,
-    departureDate: brief.arriveBy,
-    adults: brief.adults,
-  });
-  if (offers.length === 0) return null;
+  // If the user shared their location, compute the real drive time to the
+  // departure airport. All offers leave from `origin`, so this is one lookup
+  // that sharpens "leave home by" for every lane.
+  let drive: { minutes: number; cost: number; trafficAware: boolean } | null = null;
+  if (brief.originCoords) {
+    const dest = await airportCoords(origin).catch(() => null);
+    if (dest) {
+      const eta = await driveEta(brief.originCoords, dest).catch(() => null);
+      if (eta) {
+        // Rough fare model until a rideshare API is wired: base + per-km.
+        drive = {
+          minutes: eta.minutes,
+          cost: Math.max(12, Math.round(6 + eta.distanceKm * 1.6)),
+          trafficAware: eta.trafficAware,
+        };
+      }
+    }
+  }
 
-  const usable = offers
-    .filter((o) => o.slices[0]?.departingAt && o.slices[0]?.arrivingAt)
-    .slice(0, 15);
-  if (usable.length === 0) return null;
+  // "Arrive by" is a deadline, not a departure date. A long-haul leg departing
+  // ON the deadline usually lands the next morning — past it. So we look at
+  // departures the day before as well, then keep only itineraries that actually
+  // touch down (plus inbound transfer time) before the deadline expires.
+  const dayBefore = shiftDate(brief.arriveBy, -1);
+  const [sameDay, priorDay] = await Promise.all([
+    searchFlights({ origin, destination, departureDate: brief.arriveBy, adults: brief.adults }),
+    searchFlights({ origin, destination, departureDate: dayBefore, adults: brief.adults }),
+  ]);
+
+  const all = dedupeById([...sameDay, ...priorDay]).filter(
+    (o) => o.slices[0]?.departingAt && o.slices[0]?.arrivingAt
+  );
+  if (all.length === 0) return null;
+
+  const deadline = new Date(`${brief.arriveBy}T23:59:59`);
+  const onTime = all.filter((o) => {
+    const landed = new Date(o.slices[0].arrivingAt);
+    const atDoor = new Date(
+      landed.getTime() + (TRANSFER.borderMin + TRANSFER.intoCityMin) * 60_000
+    );
+    return atDoor <= deadline;
+  });
+
+  // Prefer itineraries that meet the deadline; if none do, fall back to the full
+  // set rather than showing nothing, and flag it on the response.
+  const meetsDeadline = onTime.length > 0;
+  const usable = (meetsDeadline ? onTime : all).slice(0, 20);
 
   const byPrice = [...usable].sort((a, b) => Number(a.totalAmount) - Number(b.totalAmount));
-  const byCalm = [...usable].sort(
-    (a, b) =>
-      a.slices[0].segments - b.slices[0].segments ||
-      (a.slices[0].durationMinutes ?? 9999) - (b.slices[0].durationMinutes ?? 9999)
+  const byCalm = [...usable].sort((a, b) => calmScore(a) - calmScore(b));
+  const byBalance = [...usable].sort(
+    (a, b) => rank(a, byPrice) + rank(a, byCalm) - (rank(b, byPrice) + rank(b, byCalm))
   );
-  const cheapest = byPrice[0];
-  const calmest = byCalm[0];
-  // Balanced: best combined rank of price and duration/stops.
-  const balanced =
-    [...usable].sort(
-      (a, b) => rank(a, byPrice) + rank(a, byCalm) - (rank(b, byPrice) + rank(b, byCalm))
-    )[0] ?? cheapest;
+
+  // Each lane must be a genuinely different itinerary — three identical prices
+  // makes "3 ways to make this work" meaningless. Claim in order of how
+  // strongly each lane defines itself, and only reuse when the market is thin.
+  const taken = new Set<string>();
+  const claim = (list: FlightOffer[]): FlightOffer => {
+    const pick = list.find((o) => !taken.has(o.id)) ?? list[0];
+    taken.add(pick.id);
+    return pick;
+  };
+  const cheapest = claim(byPrice);
+  const calmest = claim(byCalm);
+  const balanced = claim(byBalance);
 
   const options: PlanOption[] = [
-    buildOption("frugal", "The Frugal Route", "Lowest total cost", cheapest, brief, "money"),
-    buildOption("balanced", "The Balanced Route", "Best mix of price and calm", balanced, brief, "balanced"),
-    buildOption("calm", "The Calm Route", "Most breathing room", calmest, brief, "time"),
+    buildOption("frugal", "The Frugal Route", "Lowest total cost", cheapest, brief, "money", drive),
+    buildOption("balanced", "The Balanced Route", "Best mix of price and calm", balanced, brief, "balanced", drive),
+    buildOption("calm", "The Calm Route", "Most breathing room", calmest, brief, "time", drive),
   ];
 
   return {
     brief,
     routeLabel: `${title(brief.from)} → ${title(brief.to)}`,
+    meetsDeadline,
     options,
   };
+}
+
+function dedupeById(offers: FlightOffer[]): FlightOffer[] {
+  const seen = new Map<string, FlightOffer>();
+  for (const o of offers) if (!seen.has(o.id)) seen.set(o.id, o);
+  return [...seen.values()];
+}
+
+// Lower is calmer: nonstop first, then shorter air time, then a later departure
+// (a 9am start beats a 5am one for the same itinerary).
+function calmScore(o: FlightOffer): number {
+  const s = o.slices[0];
+  const departHour = new Date(s.departingAt).getHours();
+  const earlyPenalty = departHour < 8 ? (8 - departHour) * 20 : 0;
+  return s.segments * 600 + (s.durationMinutes ?? 9999) + earlyPenalty;
+}
+
+function shiftDate(iso: string, days: number): string {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 function rank(o: FlightOffer, list: FlightOffer[]) {
@@ -86,17 +150,22 @@ function buildOption(
   tagline: string,
   offer: FlightOffer,
   brief: TripBrief,
-  fits: PlanOption["fits"]
+  fits: PlanOption["fits"],
+  drive: { minutes: number; cost: number; trafficAware: boolean } | null
 ): PlanOption {
   const lane = LANES[id];
   const slice = offer.slices[0];
   const flightCost = Math.round(Number(offer.totalAmount));
-  const total = flightCost + TRANSFER.toAirportCost + TRANSFER.intoCityCost;
+
+  // Real drive time/fare from the user's location when available, else static.
+  const toAirportMin = drive?.minutes ?? TRANSFER.toAirportMin;
+  const toAirportCost = drive?.cost ?? TRANSFER.toAirportCost;
+  const total = flightCost + toAirportCost + TRANSFER.intoCityCost;
 
   const depart = new Date(slice.departingAt);
   const arrive = new Date(slice.arrivingAt);
   const preFlightMin =
-    TRANSFER.toAirportMin + TRANSFER.checkinMin + TRANSFER.securityWaitMin + lane.bufferMin;
+    toAirportMin + TRANSFER.checkinMin + TRANSFER.securityWaitMin + lane.bufferMin;
   const leaveHome = new Date(depart.getTime() - preFlightMin * 60_000);
   const doorClose = new Date(
     arrive.getTime() + (TRANSFER.borderMin + TRANSFER.intoCityMin) * 60_000
@@ -106,21 +175,26 @@ function buildOption(
   const under = brief.budget - total;
   const stops = slice.segments - 1;
   const flightLabel = stops === 0 ? "Nonstop" : `Flight · ${stops} stop${stops > 1 ? "s" : ""}`;
+  const driveDetail = drive
+    ? drive.trafficAware
+      ? "Live traffic — updates as conditions change"
+      : "Based on your current location"
+    : "~in typical traffic";
 
   const steps: TimelineStep[] = [
     {
       id: "home", icon: "home", time: hm(leaveHome), label: "Leave home",
-      location: `${title(brief.from)} home base`,
-      detail: "Rideshare ordered for your departure window", cost: `$${TRANSFER.toAirportCost}`, kind: "go", note: null,
+      location: drive ? "Your current location" : `${title(brief.from)} home base`,
+      detail: "Rideshare ordered for your departure window", cost: `$${toAirportCost}`, kind: "go", note: null,
     },
     {
-      id: "drive", icon: "car", time: `${hm(leaveHome)} → ${hm(addMin(leaveHome, TRANSFER.toAirportMin))}`,
+      id: "drive", icon: "car", time: `${hm(leaveHome)} → ${hm(addMin(leaveHome, toAirportMin))}`,
       label: `Rideshare to ${slice.origin}`,
-      location: `~${TRANSFER.toAirportMin} min in typical traffic`,
+      location: `~${toAirportMin} min · ${driveDetail}`,
       detail: "Fare estimate locked", cost: null, kind: "normal", note: null,
     },
     {
-      id: "checkin", icon: "checkin", time: `${hm(addMin(leaveHome, TRANSFER.toAirportMin))} → ${hm(addMin(leaveHome, TRANSFER.toAirportMin + TRANSFER.checkinMin))}`,
+      id: "checkin", icon: "checkin", time: `${hm(addMin(leaveHome, toAirportMin))} → ${hm(addMin(leaveHome, toAirportMin + TRANSFER.checkinMin))}`,
       label: "Check-in & security",
       location: `${slice.origin} · average wait ${TRANSFER.securityWaitMin} min`,
       detail: "Have your ID and boarding pass ready", cost: null, kind: "normal", note: null,
@@ -152,7 +226,7 @@ function buildOption(
 
   const costBreakdown: CostLine[] = [
     { label: `Flight (${flightLabel.toLowerCase()})`, amount: flightCost, color: "#146C7E" },
-    { label: "Rideshare to airport", amount: TRANSFER.toAirportCost, color: "#FF7A00" },
+    { label: "Rideshare to airport", amount: toAirportCost, color: "#FF7A00" },
     { label: "Train into city", amount: TRANSFER.intoCityCost, color: "#2FB4B4" },
   ];
 
@@ -172,7 +246,7 @@ function buildOption(
         : `$${Math.abs(under)} over your cap — consider the Frugal lane or a later date.`,
     legs: [
       { type: "home", label: "Home", time: "" },
-      { type: "car", label: "Rideshare", time: `${TRANSFER.toAirportMin}m` },
+      { type: "car", label: "Rideshare", time: `${toAirportMin}m` },
       { type: "flight", label: flightLabel, time: dur(slice.durationMinutes) },
       { type: "train", label: "Rail", time: `${TRANSFER.intoCityMin}m` },
     ],
@@ -180,6 +254,11 @@ function buildOption(
     steps,
     costBreakdown,
     offerId: offer.id,
+    etaFromLocation: Boolean(drive),
+    etaTrafficAware: Boolean(drive?.trafficAware),
+    originAirport: slice.origin,
+    departAt: depart.toISOString(),
+    preTransferMin: TRANSFER.checkinMin + TRANSFER.securityWaitMin + lane.bufferMin,
   };
 }
 

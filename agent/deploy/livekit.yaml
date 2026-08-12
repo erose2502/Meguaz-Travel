@@ -1,0 +1,26 @@
+# LiveKit server config for a single self-hosted EC2 node.
+# Docs: https://docs.livekit.io/home/self-hosting/deployment/
+
+port: 7880
+
+rtc:
+  # TCP fallback for restrictive networks
+  tcp_port: 7881
+  # UDP range for WebRTC media — open these in the EC2 security group
+  port_range_start: 50000
+  port_range_end: 60000
+  # On EC2 the box sees its private IP; advertise the public one to clients.
+  use_external_ip: true
+
+# API key/secret pair. Injected from the LIVEKIT_KEYS env var (see compose) so
+# the same credentials live in one place and match the web app's token route.
+keys:
+  # Populated at runtime from $LIVEKIT_KEYS; this block is a fallback for
+  # `livekit-server --config` runs outside compose. Replace before using.
+  # APIxxxxxxxx: your-secret-here
+
+logging:
+  level: info
+  json: false
+
+# Single-node needs no Redis. Add a redis block here to run multiple nodes.

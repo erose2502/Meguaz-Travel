@@ -110,6 +110,7 @@ export default function MeguazApp() {
               option={selected}
               budget={solved?.brief.budget}
               routeLabel={solved?.routeLabel}
+              originCoords={solved?.brief.originCoords ?? null}
               onBack={() => setScreen("search")}
               onBook={handleLockIn}
               isMobile={isMobile}

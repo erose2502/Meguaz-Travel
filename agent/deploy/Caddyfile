@@ -1,0 +1,8 @@
+# Automatic HTTPS/WSS for the LiveKit server. Browsers require a secure origin
+# for microphone access, so the voice agent must be reached over wss://.
+#
+# Point a DNS A record for MEGUAZ_DOMAIN at this EC2 instance's public IP first;
+# Caddy then provisions a Let's Encrypt certificate automatically on startup.
+{$MEGUAZ_DOMAIN} {
+	reverse_proxy 127.0.0.1:7880
+}
