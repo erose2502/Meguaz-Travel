@@ -1,0 +1,171 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'DM Serif Display', serif;
+  --font-body: 'Inter', sans-serif;
+  /* Meguaz brand palette */
+  --color-navy: #0D1B2A;
+  --color-navy-deep: #071320;
+  --color-teal: #146C7E;
+  --color-teal-bright: #2FB4B4;
+  --color-teal-light: #6FD0D0;
+  --color-teal-pale: #CFEDED;
+  --color-orange: #FF7A00;
+  --color-amber: #FFC857;
+  --color-cream: #F6F3EA;
+  --color-cream-light: #FFFDF8;
+  /* Aliases kept so existing utility classes keep resolving */
+  --color-sky-deep: #0D1B2A;
+  --color-sky-mid: #146C7E;
+  --color-sky-blue: #2FB4B4;
+  --color-sky-light: #6FD0D0;
+  --color-sand: #F6F3EA;
+  --color-sage: #2FB4B4;
+  --color-coral: #FF7A00;
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: 'DM Serif Display', serif;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.glass-dark {
+  background: rgba(13, 27, 42, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* Frosted white card for the light (cream) home surface */
+.glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 30px -12px rgba(13, 27, 42, 0.18);
+}
+
+/* Frosted glass over photography (headers, search bar on hero) */
+.glass-onimage {
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes drift {
+  0% { transform: translateX(0px); }
+  50% { transform: translateX(20px); }
+  100% { transform: translateX(0px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-drift {
+  animation: drift 12s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+  background-size: 200% auto;
+  animation: shimmer 2s linear infinite;
+}
+
+/* Scroll-reveal utility — works in any scroll container */
+.io-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.io-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Seamless screen transition — applied when a screen mounts */
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.995); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-screen {
+  animation: screen-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Gentle rise used for hero elements on first paint */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-rise {
+  animation: rise-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .io-reveal { opacity: 1; transform: none; transition: none; }
+  .animate-screen, .animate-rise, .animate-float, .animate-drift, .animate-pulse-glow { animation: none; }
+}
+
+.lottie-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.lottie-placeholder::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 60%);
+  pointer-events: none;
+}
