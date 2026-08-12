@@ -4,26 +4,34 @@ A travel planner that helps you get from your front door to your gate on time �
 
 Meguaz plans your whole trip end to end (flights, rideshares, trains, buses), scores each option on how far under budget it lands and how much buffer it leaves, flags bottlenecks like traffic before they cost you, and tells you exactly when to leave home.
 
-## Tech stack
+## Repo layout
 
-- **React 19** + **Vite 8**
-- **Tailwind CSS v4** (`@tailwindcss/vite`)
-- **TypeScript 5.7**
-- **GSAP** for scroll/stagger motion
-- **Phosphor Icons**
+| Path | What it is |
+|---|---|
+| `src/` | The Figma Make prototype (Vite + React 19) — **design source of truth** |
+| `web/` | The production app: Next.js 16, same screens ported verbatim + live backend |
+| `agent/` | Meguaz voice agent (LiveKit Agents, Python) deployed to LiveKit Cloud |
+| `supabase/` | SQL migrations (auth, trips, slots, caches) |
+| `brand/` | Brand board + logo system exports |
+| `docs/` | `ux-flows.md` (flow analysis) · `architecture.md` (providers & model routing) |
 
-## Getting started
+## Running the product app
 
 ```bash
-pnpm install
-pnpm dev
+cd web
+npm install
+cp .env.example .env.local   # fill in keys
+npm run dev                  # http://localhost:3000
 ```
 
-The dev server runs on `$PORT` (default 8443).
+Backend engines: Duffel (flights + resort stays, bookable), SearchApi Airbnb
+(home stays, deep link out), Perplexity sonar (ground transport intel, cached),
+OpenAI nano tier (chat/NL parsing), Supabase (auth + data), LiveKit (voice).
+
+## Running the prototype
 
 ```bash
-pnpm build     # production build
-pnpm preview   # preview the build
+pnpm install && pnpm dev   # Vite, default port 8443
 ```
 
 ## Flow
