@@ -195,6 +195,27 @@ export async function destinationMusic(city: string, country: string, signal?: A
   return (await res.json()) as { mix: DestinationMix | null }
 }
 
+// ── Destination guide (attractions + fun facts) ─────────────────────────────
+
+export type Attraction = {
+  name: string
+  kind: string
+  rating: number | null
+  why: string
+  wiki: string | null
+}
+
+export type DestinationGuide = { attractions: Attraction[]; facts: string[] }
+
+export async function destinationGuideFor(city: string, country: string, signal?: AbortSignal) {
+  const res = await fetch(
+    '/api/attractions?city=' + encodeURIComponent(city) + '&country=' + encodeURIComponent(country),
+    { signal },
+  )
+  if (!res.ok) throw new ApiError('Guide unavailable', res.status)
+  return (await res.json()) as DestinationGuide
+}
+
 // ── Destination weather ─────────────────────────────────────────────────────
 
 export type DayForecast = {

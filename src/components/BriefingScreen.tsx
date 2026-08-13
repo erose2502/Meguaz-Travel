@@ -11,6 +11,7 @@ import {
   foodSuggestions,
   listReviews,
   submitReview,
+  type Attraction,
   type FoodSpot,
   type Review,
 } from '../lib/api'
@@ -18,12 +19,57 @@ import {
 type Props = {
   dest: Destination
   signedIn: boolean
+  /** Researched places worth the traveller's time, with public ratings. */
+  attractions: Attraction[]
   /** Where the traveller actually is; flight time is computed from here. */
   originCoords: { lat: number; lng: number } | null
   originLabel: string
   goHome: () => void
   goPhrases: () => void
   goAccount: () => void
+}
+
+/** Attraction photo via its Wikipedia article — stable, embeddable, free. */
+function WikiPhoto({ title, alt }: { title: string | null; alt: string }) {
+  const [src, setSrc] = useState<string | null>(null)
+  useEffect(() => {
+    setSrc(null)
+    if (!title) return
+    const controller = new AbortController()
+    fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title), {
+      signal: controller.signal,
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const thumb: string | undefined = j?.thumbnail?.source
+        if (thumb) setSrc(thumb.replace(/\/\d+px-/, '/640px-'))
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [title])
+
+  if (!src) {
+    return (
+      <div
+        aria-hidden="true"
+        style={{
+          height: 128,
+          background:
+            'linear-gradient(135deg, var(--color-accent-100), var(--color-accent-2-100))',
+        }}
+      />
+    )
+  }
+  return (
+    <img
+      className="washed"
+      src={src}
+      alt={alt}
+      loading="lazy"
+      onError={() => setSrc(null)}
+      style={{ width: '100%', height: 128, objectFit: 'cover', display: 'block' }}
+    />
+  )
 }
 
 function Stars({
@@ -85,6 +131,7 @@ function Fact({ icon, label, value }: { icon: IconName; label: string; value: st
 export default function BriefingScreen({
   dest,
   signedIn,
+  attractions,
   originCoords,
   originLabel,
   goHome,
@@ -335,6 +382,62 @@ export default function BriefingScreen({
             </p>
           </div>
         </div>
+      )}
+
+      {/* Worth your time — researched attractions with photos and ratings */}
+      {attractions.length > 0 && (
+        <>
+          <h2 style={{ fontSize: 'clamp(20px,2.2vw,26px)', margin: 'clamp(22px,2.6vw,30px) 0 clamp(10px,1.4vw,14px)' }}>
+            Worth your time
+          </h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: 'clamp(10px,1.2vw,14px)',
+            }}
+          >
+            {attractions.map((spot) => (
+              <div
+                key={spot.name}
+                className="glass-soft"
+                style={{ borderRadius: 20, overflow: 'hidden' }}
+              >
+                <WikiPhoto title={spot.wiki} alt={spot.name} />
+                <div style={{ padding: '12px 16px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                    <p style={{ fontFamily: 'var(--font-heading)', fontSize: 16, lineHeight: 1.2, margin: 0, flex: 1 }}>
+                      {spot.name}
+                    </p>
+                    {spot.rating !== null && (
+                      <span
+                        style={{
+                          flex: 'none',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: 'var(--color-accent-700)',
+                        }}
+                      >
+                        ★ {spot.rating.toFixed(1)}
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--color-neutral-600)', margin: '3px 0 0', textTransform: 'capitalize' }}>
+                    {spot.kind}
+                  </p>
+                  {spot.why && (
+                    <p style={{ fontSize: 12, lineHeight: 1.55, color: 'var(--color-neutral-700)', margin: '6px 0 0' }}>
+                      {spot.why}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: 10, color: 'var(--color-neutral-500)', margin: '8px 0 0' }}>
+            Ratings are public review averages · photos via Wikipedia
+          </p>
+        </>
       )}
 
       {/* Eat like a local — one cached research call per city per month */}

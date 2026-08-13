@@ -30,8 +30,10 @@ import { sceneUrls } from './data/scenes'
 import { searchDestinations } from './lib/search'
 import {
   createTrip,
+  destinationGuideFor,
   type BookingResult,
   type CabinClass,
+  type DestinationGuide,
   type PlanOption,
   type TransferMode,
   type TripBrief,
@@ -134,6 +136,9 @@ export default function App({
   const [selected, setSelected] = useState<PlanOption | null>(null)
   const [bookingOpen, setBookingOpen] = useState(false)
   const [booking, setBooking] = useState<BookingResult | null>(null)
+  // Per-destination intel (fun facts for the hero, attractions for the
+  // briefing) — one server-cached research call per city per month.
+  const [guide, setGuide] = useState<DestinationGuide | null>(null)
 
   const [companions, setCompanions] = useState<string[]>([])
   const [cabinClass, setCabinClass] = useState<CabinClass>('economy')
@@ -338,6 +343,20 @@ export default function App({
 
   const originAirport = plan?.options[0]?.originAirport || originIata || home.airports[0]?.iata || 'SFO'
 
+  // Fetch the destination guide when a city is chosen (server caches 30 days).
+  useEffect(() => {
+    setGuide(null)
+    if (!dest) return
+    const controller = new AbortController()
+    destinationGuideFor(dest.city, dest.country, controller.signal)
+      .then(setGuide)
+      .catch(() => {
+        /* generic facts and no attractions section — never an error state */
+      })
+    return () => controller.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dest?.code])
+
   // A curated plan card is a pre-filled brief: set the destination (and trip
   // length when the plan carries one) and go straight into a live solve. No
   // fares are fetched until this moment — browsing is free.
@@ -486,6 +505,7 @@ export default function App({
               priority={priority}
               trips={tripsState.trips}
               signedIn={!!account.user}
+              destFacts={guide?.facts ?? []}
               hasPhrasePack={!!dest && !!PHRASES[dest.lang]}
               phraseKicker={(dest?.lang ?? '') + ' · six phrases'}
               phrasesSaved={learnedCount}
@@ -627,6 +647,7 @@ export default function App({
             <BriefingScreen
               dest={dest}
               signedIn={!!account.user}
+              attractions={guide?.attractions ?? []}
               originCoords={home.coords}
               originLabel={home.status === 'resolved' ? home.resolvedCity : 'your area'}
               goHome={go('home')}

@@ -42,6 +42,8 @@ type Props = {
   priority: Priority
   trips: Trip[]
   signedIn: boolean
+  /** Destination-specific fun facts; the ticker uses these once a city is picked. */
+  destFacts: string[]
   hasPhrasePack: boolean
   phraseKicker: string
   phrasesSaved: number
@@ -369,6 +371,7 @@ export default function HomeScreen(props: Props) {
     priority,
     trips,
     signedIn,
+    destFacts,
     hasPhrasePack,
     phraseKicker,
     phrasesSaved,
@@ -445,7 +448,10 @@ export default function HomeScreen(props: Props) {
           {priority} · your travel priority
         </span>
         <AnimatedHeadline text={dest ? dest.city + ', your way.' : 'Your journey, perfected.'} />
-        <FactTicker facts={FUN_FACTS} />
+        <FactTicker
+          key={dest && destFacts.length > 0 ? dest.code : 'general'}
+          facts={dest && destFacts.length > 0 ? destFacts : FUN_FACTS}
+        />
       </div>
 
       {/* Trip brief — the first solid surface on the water */}
