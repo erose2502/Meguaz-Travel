@@ -413,8 +413,36 @@ export function bookFlight(params: {
   phone: string
   passengers: BookingPassenger[]
   approvedAmount: number
+  destCity?: string
+  whatsappOptIn?: boolean
 }) {
   return post<BookingResult>('/api/book', params)
+}
+
+// ── Ad-funnel tracking (Meta) ───────────────────────────────────────────────
+
+export type TrackEvent = 'Search' | 'ViewContent' | 'InitiateCheckout'
+
+/**
+ * Fire one funnel event to the browser Pixel (when loaded) and the server
+ * Conversions API with a shared event id, so Meta dedupes the pair. Purchase
+ * is server-only — /api/book emits it where a real order exists.
+ * Fire-and-forget: analytics never surfaces as a user-facing failure.
+ */
+export function track(event: TrackEvent, data?: { value?: number; currency?: string }) {
+  try {
+    const eventId = crypto.randomUUID()
+    const fbq = (window as { fbq?: (...args: unknown[]) => void }).fbq
+    if (fbq) fbq('track', event, data ?? {}, { eventID: eventId })
+    void fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, eventId, url: window.location.href, ...data }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    /* never let tracking throw into app code */
+  }
 }
 
 // ── Saved trips ─────────────────────────────────────────────────────────────

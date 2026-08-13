@@ -38,6 +38,25 @@ export const env = {
     return required("YOUTUBE_API_KEY");
   },
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+  // Meta (WhatsApp Cloud API + Conversions API). All optional — the features
+  // no-op when unset, so a deploy without credentials stays safe.
+  get metaWaToken() {
+    return process.env.META_WA_TOKEN ?? "";
+  },
+  get metaWaPhoneId() {
+    return process.env.META_WA_PHONE_ID ?? "";
+  },
+  // hello_world is the only pre-approved template on a fresh Meta app; switch
+  // to the real booking template via env once Meta approves it.
+  get metaWaTemplate() {
+    return process.env.META_WA_TEMPLATE ?? "hello_world";
+  },
+  get metaPixelId() {
+    return process.env.META_PIXEL_ID ?? "";
+  },
+  get metaCapiToken() {
+    return process.env.META_CAPI_TOKEN ?? "";
+  },
   // Budget guards
   maxTokensPerSession: Number(process.env.MAX_TOKENS_PER_SESSION ?? 60_000),
   maxHistoryTurns: Number(process.env.MAX_HISTORY_TURNS ?? 8),

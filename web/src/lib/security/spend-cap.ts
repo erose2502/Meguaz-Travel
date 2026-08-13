@@ -21,7 +21,9 @@ export type Provider =
   | "elevenlabs"
   | "searchapi"
   | "maps"
-  | "youtube";
+  | "youtube"
+  | "whatsapp"
+  | "meta";
 
 // Calls per provider per UTC day, all users combined. Override per environment
 // with SPEND_CAP_<PROVIDER>; 0 blocks the provider entirely (kill switch).
@@ -33,6 +35,8 @@ const DEFAULT_CAPS: Record<Provider, number> = {
   searchapi: 150, // hotel searches; cached 6h per query
   maps: 2000, // routing + geocoding; cheap per call but metered
   youtube: 90, // searches cost 100 quota units of the 10k/day allowance
+  whatsapp: 300, // booking confirmations; conversations bill per 24h window
+  meta: 5000, // Conversions API events; free but a runaway loop is still noise
 };
 
 export function capFor(provider: Provider): number {

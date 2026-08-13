@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getOffer, createOrder, type OrderPassenger } from "@/lib/providers/duffel";
+import { sendBookingConfirmation } from "@/lib/providers/whatsapp";
+import { sendMetaEvent } from "@/lib/providers/meta-capi";
 import { guard, failure, capExceeded } from "@/lib/security/guard";
 import { SpendCapError } from "@/lib/security/spend-cap";
 import { captureServerError } from "@/lib/monitoring";
@@ -24,6 +26,10 @@ const schema = z.object({
   passengers: z.array(passengerSchema).min(1).max(9),
   /** The price the traveller saw; we refuse to book if it moved above this. */
   approvedAmount: z.number().positive(),
+  /** Cosmetic — names the destination in the WhatsApp confirmation. */
+  destCity: z.string().min(1).max(80).optional(),
+  /** Traveller ticked "WhatsApp me the confirmation" in the booking sheet. */
+  whatsappOptIn: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -37,7 +43,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Check the traveller details" }, { status: 400 });
   }
-  const { offerId, email, phone, passengers, approvedAmount } = parsed.data;
+  const { offerId, email, phone, passengers, approvedAmount, destCity, whatsappOptIn } = parsed.data;
 
   try {
     const offer = await getOffer(offerId);
@@ -82,6 +88,31 @@ export async function POST(req: NextRequest) {
     }));
 
     const order = await createOrder(offer, orderPassengers);
+
+    // Post-booking side effects are strictly non-blocking: a failed
+    // notification or analytics event must never fail a paid order. Both
+    // no-op until Meta credentials exist, and both sit behind spend caps.
+    if (whatsappOptIn) {
+      sendBookingConfirmation({
+        phone,
+        destCity: destCity ?? "your destination",
+        reference: order.bookingReference ?? order.orderId.slice(0, 10),
+        total: Number(order.totalAmount),
+        currency: order.totalCurrency,
+      }).catch((err) => captureServerError("whatsapp-confirm", err));
+    }
+    sendMetaEvent({
+      name: "Purchase",
+      value: Number(order.totalAmount),
+      currency: order.totalCurrency,
+      email,
+      phone,
+      ip: (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || undefined,
+      userAgent: req.headers.get("user-agent") ?? undefined,
+      fbp: req.cookies.get("_fbp")?.value,
+      fbc: req.cookies.get("_fbc")?.value,
+    }).catch((err) => captureServerError("meta-capi", err));
+
     return NextResponse.json({
       orderId: order.orderId,
       bookingReference: order.bookingReference,

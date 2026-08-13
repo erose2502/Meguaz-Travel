@@ -31,6 +31,7 @@ import { searchDestinations } from './lib/search'
 import {
   createTrip,
   destinationGuideFor,
+  track,
   type BookingResult,
   type CabinClass,
   type DestinationGuide,
@@ -38,6 +39,7 @@ import {
   type TransferMode,
   type TripBrief,
 } from './lib/api'
+import { initPixel } from './lib/pixel'
 import { useLiveLeaveBy, useTripPlan } from './lib/useTripPlan'
 import { useHomeCity } from './lib/useHomeCity'
 import { useAccount } from './lib/useAccount'
@@ -153,6 +155,11 @@ export default function App({
     window.addEventListener('resize', onResize)
     onResize()
     return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // Meta Pixel loads only when the server has an id configured (/api/config).
+  useEffect(() => {
+    void initPixel()
   }, [])
 
   // Motion: each screen's sections rise into place; the ambient blooms drift
@@ -311,6 +318,7 @@ export default function App({
   // Lock = book. Signed-in travellers get the passenger sheet; everyone else
   // signs in first and lands back here.
   const lockPlan = () => {
+    track('InitiateCheckout', selected ? { value: selected.cost, currency: 'USD' } : undefined)
     if (account.user) {
       setBooking(null)
       setBookingOpen(true)

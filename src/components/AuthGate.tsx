@@ -41,6 +41,17 @@ const LABEL: CSSProperties = {
   margin: '0 0 5px',
 }
 
+function FacebookMark({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#1877F2"
+        d="M24 12a12 12 0 1 0-13.875 11.854v-8.385H7.078V12h3.047V9.356c0-3.007 1.792-4.668 4.533-4.668 1.312 0 2.686.234 2.686.234v2.953H15.83c-1.491 0-1.956.925-1.956 1.874V12h3.328l-.532 3.469h-2.796v8.385A12 12 0 0 0 24 12z"
+      />
+    </svg>
+  )
+}
+
 function GoogleMark({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
@@ -223,6 +234,35 @@ export default function AuthGate({ option, destCity, onSignIn, onSignUp, onDone,
         >
           <GoogleMark />
           Continue with Google
+        </button>
+
+        <button
+          type="button"
+          className="hv-white"
+          onClick={() => {
+            window.location.assign(
+              '/api/auth/facebook?next=' + encodeURIComponent(window.location.origin + '/'),
+            )
+          }}
+          style={{
+            marginTop: 10,
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            padding: 13,
+            borderRadius: 999,
+            border: '1px solid var(--color-divider)',
+            background: 'rgba(255,255,255,0.85)',
+            fontFamily: 'var(--font-heading)',
+            fontSize: 14,
+            color: 'var(--color-text)',
+            cursor: 'pointer',
+          }}
+        >
+          <FacebookMark />
+          Continue with Facebook
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 0' }}>

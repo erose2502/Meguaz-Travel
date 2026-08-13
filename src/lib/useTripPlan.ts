@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, driveEta, solvePlan, type PlanOption, type SolveResponse, type TripBrief } from './api'
+import { ApiError, driveEta, solvePlan, track, type PlanOption, type SolveResponse, type TripBrief } from './api'
 
 /** Airline offers expire; re-solving on a timer keeps the prices on screen real. */
 const REFRESH_MS = 90_000
@@ -46,6 +46,9 @@ export function useTripPlan(brief: TripBrief, active: boolean): PlanState {
         if (controller.signal.aborted) return
         setPlan(result)
         setLastUpdated(Date.now())
+        // First solve of a brief is the funnel's Search step; silent
+        // background refreshes are not new intent.
+        if (!isRefresh) track('Search')
       } catch (err) {
         if (controller.signal.aborted || (err as Error).name === 'AbortError') return
         const message =

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Icon from './Icon'
 import TripPrep from './TripPrep'
+import { shareStoryCard } from '../lib/shareCard'
 import type { BookingResult, PlanOption } from '../lib/api'
 import type { Destination } from '../data/destinations'
 
@@ -78,6 +79,30 @@ export default function LockedScreen({
   const under = option ? budget - option.cost : 0
   const departure = leaveBy || option?.leaveBy || '—'
   const [shared, setShared] = useState(false)
+  const [cardState, setCardState] = useState<'idle' | 'busy' | 'done'>('idle')
+
+  const storyCard = async () => {
+    if (!dest || cardState === 'busy') return
+    setCardState('busy')
+    try {
+      const outcome = await shareStoryCard({
+        city: dest.city,
+        country: dest.country,
+        code: dest.code,
+        nights,
+        cost: option?.cost ?? null,
+        arriveBy,
+      })
+      if (outcome === 'downloaded') {
+        setCardState('done')
+        setTimeout(() => setCardState('idle'), 2500)
+        return
+      }
+    } catch {
+      /* user dismissed the share sheet */
+    }
+    setCardState('idle')
+  }
 
   const shareTrip = async () => {
     if (!dest) return
@@ -302,6 +327,29 @@ export default function LockedScreen({
         >
           <Icon name={shared ? 'check' : 'share'} size={15} />
           {shared ? 'Link copied' : 'Share'}
+        </button>
+        <button
+          className="glass hv-white"
+          onClick={storyCard}
+          disabled={!dest || cardState === 'busy'}
+          title="A story-sized poster of this trip — the share sheet opens straight into Instagram"
+          style={{
+            flex: '1 1 150px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: 13,
+            borderRadius: 999,
+            fontFamily: 'var(--font-heading)',
+            fontSize: 13,
+            color: cardState === 'done' ? 'var(--color-accent-2-700)' : 'var(--color-text)',
+            cursor: 'pointer',
+            opacity: dest ? 1 : 0.5,
+          }}
+        >
+          <Icon name={cardState === 'done' ? 'check' : 'instagram'} size={15} />
+          {cardState === 'busy' ? 'Rendering…' : cardState === 'done' ? 'Card saved' : 'Story card'}
         </button>
         <button
           className="hv-accent"

@@ -51,6 +51,7 @@ export default function BookingSheet({ option, destCity, adults, email, onClose,
   )
   const [contactEmail, setContactEmail] = useState(email)
   const [phone, setPhone] = useState('')
+  const [waOptIn, setWaOptIn] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -69,6 +70,8 @@ export default function BookingSheet({ option, destCity, adults, email, onClose,
         phone,
         passengers,
         approvedAmount: option.cost,
+        destCity,
+        whatsappOptIn: waOptIn,
       })
       onBooked(result)
     } catch (err) {
@@ -234,6 +237,27 @@ export default function BookingSheet({ option, destCity, adults, email, onClose,
             />
           </div>
         </div>
+
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+            marginTop: 12,
+            fontSize: 12.5,
+            lineHeight: 1.4,
+            color: 'var(--color-neutral-700)',
+            cursor: 'pointer',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={waOptIn}
+            onChange={(e) => setWaOptIn(e.target.checked)}
+            style={{ width: 16, height: 16, flex: 'none', accentColor: 'var(--color-accent)' }}
+          />
+          WhatsApp me the confirmation and trip updates on this number
+        </label>
 
         {error && (
           <p
