@@ -25,14 +25,16 @@ const SYSTEM = `You are a travel researcher. For a given city return JSON ONLY:
 {"facts":[string,...],"attractions":[{"name":string,"kind":string,
 "rating":number|null,"why":string,"wiki":string|null}]}.
 facts: 4-6 fun, TRUE, surprising one-liners about the city a traveller would
-enjoy — each starting with "Fun fact:". attractions: max 6 places genuinely
-worth a visit, most essential first; rating is the current public review
-average (e.g. 4.7) or null if unsure — never invent precision; wiki is the
-EXACT English Wikipedia article title for the place, or null if none exists.
-No chains, no tourist traps.`;
+enjoy — each starting with "Fun fact:", plain text only, NO markdown of any
+kind. attractions: max 6 places genuinely worth a visit, most essential first;
+rating is the public review average as commonly reported on major review
+platforms, one decimal (e.g. 4.7) — most famous attractions have one; null
+only if genuinely not reviewed; wiki is the EXACT English Wikipedia article
+title for the place, or null if none exists. No chains, no tourist traps.`;
 
 export async function destinationGuide(city: string, country: string): Promise<DestinationGuide> {
-  const cacheKey = `guide:${city}:${country}`.toLowerCase();
+  // v2: markdown stripping + rating nudge; bypasses v1 cached entries.
+  const cacheKey = `guide:v2:${city}:${country}`.toLowerCase();
   const cached = await cacheGet<DestinationGuide>(cacheKey);
   if (cached) return cached;
 
@@ -62,6 +64,11 @@ export async function destinationGuide(city: string, country: string): Promise<D
   return guide;
 }
 
+/** Models sneak markdown into prose no matter what the prompt says. */
+function plain(s: string): string {
+  return s.replace(/\*\*|__|`/g, "").replace(/\s+/g, " ").trim();
+}
+
 function parse(content: string): DestinationGuide {
   const match = content.match(/\{[\s\S]*\}/);
   if (!match) return { attractions: [], facts: [] };
@@ -70,19 +77,19 @@ function parse(content: string): DestinationGuide {
     const attractions: Attraction[] = (Array.isArray(parsed.attractions) ? parsed.attractions : [])
       .slice(0, 6)
       .map((a: Record<string, unknown>) => ({
-        name: String(a.name ?? ""),
-        kind: String(a.kind ?? "landmark"),
+        name: plain(String(a.name ?? "")),
+        kind: plain(String(a.kind ?? "landmark")),
         rating:
           typeof a.rating === "number" && a.rating >= 1 && a.rating <= 5
             ? Math.round(a.rating * 10) / 10
             : null,
-        why: String(a.why ?? ""),
+        why: plain(String(a.why ?? "")),
         wiki: a.wiki ? String(a.wiki) : null,
       }))
       .filter((a: Attraction) => a.name);
     const facts: string[] = (Array.isArray(parsed.facts) ? parsed.facts : [])
       .slice(0, 6)
-      .map((f: unknown) => String(f))
+      .map((f: unknown) => plain(String(f)))
       .filter((f: string) => f.length > 12 && f.length < 240);
     return { attractions, facts };
   } catch {
