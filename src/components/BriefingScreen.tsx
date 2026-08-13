@@ -7,6 +7,7 @@ import { useCityIntro } from '../lib/countryFacts'
 import { PHRASES } from '../data/phrases'
 import {
   deleteReview,
+  flightEta,
   foodSuggestions,
   listReviews,
   submitReview,
@@ -17,6 +18,9 @@ import {
 type Props = {
   dest: Destination
   signedIn: boolean
+  /** Where the traveller actually is; flight time is computed from here. */
+  originCoords: { lat: number; lng: number } | null
+  originLabel: string
   goHome: () => void
   goPhrases: () => void
   goAccount: () => void
@@ -78,10 +82,33 @@ function Fact({ icon, label, value }: { icon: IconName; label: string; value: st
   )
 }
 
-export default function BriefingScreen({ dest, signedIn, goHome, goPhrases, goAccount }: Props) {
+export default function BriefingScreen({
+  dest,
+  signedIn,
+  originCoords,
+  originLabel,
+  goHome,
+  goPhrases,
+  goAccount,
+}: Props) {
   const { intro } = useCityIntro(dest)
   const essentials = COUNTRY_ESSENTIALS[dest.cc]
   const hasPack = !!PHRASES[dest.lang]
+
+  // Flight time from where the traveller actually is — the dataset's hours
+  // are San-Francisco-relative samples and wrong for everyone else.
+  const [liveHours, setLiveHours] = useState<number | null>(null)
+  useEffect(() => {
+    setLiveHours(null)
+    if (!originCoords) return
+    const controller = new AbortController()
+    flightEta(originCoords, dest.code, controller.signal)
+      .then((r) => setLiveHours(r.hours))
+      .catch(() => {
+        /* fall back to the generic figure */
+      })
+    return () => controller.abort()
+  }, [dest.code, originCoords])
 
   // "Eat like a local" — researched once per city and cached server-side for a
   // month; the section simply doesn't render if the lookup fails.
@@ -217,7 +244,10 @@ export default function BriefingScreen({ dest, signedIn, goHome, goPhrases, goAc
               {dest.city}, {dest.country}
             </p>
             <p style={{ fontSize: 13, color: 'var(--color-neutral-700)', margin: '3px 0 0' }}>
-              {formatDuration(dest.hrs)} from San Francisco · fares from ${dest.price} · {dest.code}
+              {liveHours !== null
+                ? '~' + formatDuration(liveHours) + ' flight from ' + originLabel
+                : '~' + formatDuration(dest.hrs) + ' typical flight'}
+              {' · fares from $' + dest.price + ' · ' + dest.code}
             </p>
           </div>
           <span className="tag tag-accent-2">{dest.lang} spoken</span>

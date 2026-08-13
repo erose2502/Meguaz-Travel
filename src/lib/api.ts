@@ -169,6 +169,19 @@ export function driveEta(
   return post<DriveEta>('/api/location/eta', params, signal)
 }
 
+/** Great-circle flight estimate from the traveller's location to an airport. */
+export function flightEta(
+  coords: { lat: number; lng: number },
+  airport: string,
+  signal?: AbortSignal,
+) {
+  return post<{ distanceKm: number; hours: number }>(
+    '/api/location/flight-eta',
+    { ...coords, airport },
+    signal,
+  )
+}
+
 // ── Destination music ───────────────────────────────────────────────────────
 
 export type DestinationMix = { videoId: string; title: string; channel: string }

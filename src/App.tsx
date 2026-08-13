@@ -627,6 +627,8 @@ export default function App({
             <BriefingScreen
               dest={dest}
               signedIn={!!account.user}
+              originCoords={home.coords}
+              originLabel={home.status === 'resolved' ? home.resolvedCity : 'your area'}
               goHome={go('home')}
               goPhrases={go('phrases')}
               goAccount={go('account')}
