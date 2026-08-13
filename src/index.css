@@ -344,6 +344,17 @@ button { font-family: var(--font-body); }
   }
 }
 
+/* Native number-input spinners never match the glass language. */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* — carousel rail: native touch scroll with snap; arrows on pointer devices — */
 .mg-rail {
   display: flex;

@@ -68,6 +68,70 @@ const FIELD: CSSProperties = {
   outline: 'none',
 }
 
+/** −/+ control for small counts — raw number-input spinners have no place here. */
+function Stepper({
+  value,
+  min,
+  max,
+  onChange,
+  label,
+}: {
+  value: number
+  min: number
+  max: number
+  onChange: (v: number) => void
+  label: string
+}) {
+  const btn = (dir: -1 | 1, disabled: boolean): CSSProperties => ({
+    width: 30,
+    height: 30,
+    flex: 'none',
+    borderRadius: 999,
+    border: 0,
+    background: disabled ? 'transparent' : 'rgba(255,255,255,0.85)',
+    boxShadow: disabled ? 'none' : '0 1px 3px rgba(46,43,37,0.15)',
+    fontSize: 16,
+    fontWeight: 700,
+    lineHeight: 1,
+    color: disabled ? 'var(--color-neutral-400)' : 'var(--color-text)',
+    cursor: disabled ? 'default' : 'pointer',
+  })
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      style={{
+        ...FIELD,
+        padding: '0 5px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 4,
+      }}
+    >
+      <button
+        type="button"
+        aria-label={'Fewer ' + label.toLowerCase()}
+        disabled={value <= min}
+        onClick={() => onChange(Math.max(min, value - 1))}
+        style={btn(-1, value <= min)}
+      >
+        −
+      </button>
+      <span style={{ fontSize: 14, fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{value}</span>
+      <button
+        type="button"
+        aria-label={'More ' + label.toLowerCase()}
+        disabled={value >= max}
+        onClick={() => onChange(Math.min(max, value + 1))}
+        style={btn(1, value >= max)}
+      >
+        +
+      </button>
+    </div>
+  )
+}
+
 export default function TripBriefBar(props: Props) {
   const {
     query,
@@ -340,19 +404,11 @@ export default function TripBriefBar(props: Props) {
         </div>
 
         {/* Trip length — prices the return leg so the total is the whole trip */}
-        <div style={{ flex: '0 1 96px', minWidth: 88 }}>
-          <label style={LABEL} htmlFor="mg-nights">
+        <div style={{ flex: '0 1 108px', minWidth: 100 }}>
+          <span style={LABEL} id="mg-nights-label">
             Nights
-          </label>
-          <input
-            id="mg-nights"
-            type="number"
-            min={1}
-            max={90}
-            value={nights}
-            onChange={(e) => onNights(Math.max(1, Math.min(90, Number(e.target.value) || 1)))}
-            style={FIELD}
-          />
+          </span>
+          <Stepper value={nights} min={1} max={90} onChange={onNights} label="Nights" />
         </div>
 
         {/* Budget */}
@@ -406,19 +462,11 @@ export default function TripBriefBar(props: Props) {
         </div>
 
         {/* Travellers */}
-        <div style={{ flex: '0 1 96px', minWidth: 88 }}>
-          <label style={LABEL} htmlFor="mg-adults">
+        <div style={{ flex: '0 1 108px', minWidth: 100 }}>
+          <span style={LABEL} id="mg-adults-label">
             Travellers
-          </label>
-          <input
-            id="mg-adults"
-            type="number"
-            min={1}
-            max={9}
-            value={adults}
-            onChange={(e) => onAdults(Number(e.target.value))}
-            style={FIELD}
-          />
+          </span>
+          <Stepper value={adults} min={1} max={9} onChange={onAdults} label="Travellers" />
         </div>
 
         <button

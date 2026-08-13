@@ -8,7 +8,6 @@ type Props = {
   id?: string
 }
 
-const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const MONTHS = [
   'January',
   'February',
@@ -128,76 +127,77 @@ export default function DatePicker({ value, onChange, id = 'mg-date' }: Props) {
           className="popover"
           style={{
             position: 'absolute',
-            top: 'calc(100% + 6px)',
+            top: 'calc(100% + 8px)',
             left: 0,
             zIndex: 60,
-            width: 268,
-            borderRadius: 20,
-            padding: 14,
+            width: 312,
+            borderRadius: 22,
+            padding: 16,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span
+              style={{
+                flex: 1,
+                fontFamily: 'var(--font-heading)',
+                fontSize: 17,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {MONTHS[view.m]}{' '}
+              <span style={{ color: 'var(--color-neutral-500)' }}>{view.y}</span>
+            </span>
             <button
               type="button"
               onClick={() => step(-1)}
               aria-label="Previous month"
               className="hv-white"
               style={{
-                width: 30,
-                height: 30,
+                width: 32,
+                height: 32,
                 borderRadius: 999,
-                border: '1px solid rgba(255,255,255,0.7)',
-                background: 'rgba(255,255,255,0.55)',
+                border: '1px solid var(--color-divider)',
+                background: 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                transform: 'rotate(180deg)',
               }}
             >
-              <Icon name="chevronRight" size={14} color="var(--color-neutral-700)" />
+              <Icon name="arrowLeft" size={14} color="var(--color-neutral-700)" />
             </button>
-            <span
-              style={{
-                flex: 1,
-                textAlign: 'center',
-                fontFamily: 'var(--font-heading)',
-                fontSize: 15,
-              }}
-            >
-              {MONTHS[view.m]} {view.y}
-            </span>
             <button
               type="button"
               onClick={() => step(1)}
               aria-label="Next month"
               className="hv-white"
               style={{
-                width: 30,
-                height: 30,
+                width: 32,
+                height: 32,
                 borderRadius: 999,
-                border: '1px solid rgba(255,255,255,0.7)',
-                background: 'rgba(255,255,255,0.55)',
+                border: '1px solid var(--color-divider)',
+                background: 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
               }}
             >
-              <Icon name="chevronRight" size={14} color="var(--color-neutral-700)" />
+              <Icon name="arrowRight" size={14} color="var(--color-neutral-700)" />
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2, marginBottom: 4 }}>
-            {DAY_LETTERS.map((letter, i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3, marginBottom: 6 }}>
+            {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((letter) => (
               <span
-                key={i}
+                key={letter}
                 style={{
                   textAlign: 'center',
                   fontSize: 10,
                   fontWeight: 700,
-                  letterSpacing: '0.06em',
-                  color: 'var(--color-neutral-600)',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: 'var(--color-neutral-500)',
                   padding: '2px 0',
                 }}
               >
@@ -206,7 +206,7 @@ export default function DatePicker({ value, onChange, id = 'mg-date' }: Props) {
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3 }}>
             {cells.map((day, i) => {
               if (day === null) return <span key={'b' + i} />
               const iso = toIso(view.y, view.m, day)
@@ -223,54 +223,82 @@ export default function DatePicker({ value, onChange, id = 'mg-date' }: Props) {
                     setOpen(false)
                   }}
                   style={{
-                    height: 32,
-                    borderRadius: 10,
-                    border: isToday && !isSelected ? '1px solid var(--color-accent-400)' : '1px solid transparent',
+                    position: 'relative',
+                    height: 38,
+                    borderRadius: 12,
+                    border: 0,
                     background: isSelected ? 'var(--color-accent)' : 'transparent',
+                    boxShadow: isSelected ? '0 6px 16px -6px rgba(140,73,26,0.55)' : 'none',
                     color: isSelected
                       ? 'var(--color-bg)'
                       : isPast
                         ? 'var(--color-neutral-400)'
                         : 'var(--color-text)',
-                    fontSize: 13,
+                    fontSize: 13.5,
                     fontWeight: isSelected ? 700 : 500,
-                    cursor: isPast ? 'not-allowed' : 'pointer',
-                    transition: 'background 140ms ease',
+                    cursor: isPast ? 'default' : 'pointer',
+                    transition: 'background 140ms ease, box-shadow 140ms ease',
                   }}
                   onMouseEnter={(e) => {
-                    if (!isSelected && !isPast) e.currentTarget.style.background = 'rgba(255,255,255,0.7)'
+                    if (!isSelected && !isPast) e.currentTarget.style.background = 'var(--color-accent-100)'
                   }}
                   onMouseLeave={(e) => {
                     if (!isSelected) e.currentTarget.style.background = 'transparent'
                   }}
                 >
                   {day}
+                  {isToday && !isSelected && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: '50%',
+                        bottom: 4,
+                        transform: 'translateX(-50%)',
+                        width: 4,
+                        height: 4,
+                        borderRadius: 999,
+                        background: 'var(--color-accent)',
+                      }}
+                    />
+                  )}
                 </button>
               )
             })}
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              onChange(todayIso)
-              setOpen(false)
-            }}
-            style={{
-              marginTop: 10,
-              width: '100%',
-              padding: '8px 0',
-              borderRadius: 999,
-              border: '1px solid var(--color-divider)',
-              background: 'rgba(255,255,255,0.5)',
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'var(--color-neutral-700)',
-              cursor: 'pointer',
-            }}
-          >
-            Today
-          </button>
+          {/* Nobody flies today — quick-picks that match how trips are planned. */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+            {[
+              { label: 'In a week', days: 7 },
+              { label: 'Two weeks', days: 14 },
+              { label: 'A month', days: 30 },
+            ].map((chip) => (
+              <button
+                key={chip.days}
+                type="button"
+                onClick={() => {
+                  const d = new Date()
+                  d.setDate(d.getDate() + chip.days)
+                  onChange(d.toISOString().slice(0, 10))
+                  setOpen(false)
+                }}
+                className="hv-white"
+                style={{
+                  flex: 1,
+                  padding: '8px 0',
+                  borderRadius: 999,
+                  border: '1px solid var(--color-divider)',
+                  background: 'transparent',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: 'var(--color-neutral-700)',
+                  cursor: 'pointer',
+                }}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
