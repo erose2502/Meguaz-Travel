@@ -383,7 +383,9 @@ export default function App({
         background: 'var(--color-bg)',
         color: 'var(--color-text)',
         fontFamily: 'var(--font-body)',
-        overflowX: 'hidden',
+        // clip, not hidden: hidden would make this div a scroll container and
+        // break the sticky header inside it.
+        overflowX: 'clip',
       }}
     >
       {/* The living background: cinematic reel → oasis blooms → legibility

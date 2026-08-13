@@ -83,10 +83,13 @@ body {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   /* Nothing may create a horizontal page scroll; wide content must wrap.
-     `hidden` rather than `clip` — older iOS Safari ignores clip. */
+     `clip` (with `hidden` as the legacy fallback) — hidden turns the body into
+     a scroll container, which silently breaks every position:sticky child;
+     clip clips without doing that. */
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* iOS zooms the whole page when focusing an input whose font is under 16px —
