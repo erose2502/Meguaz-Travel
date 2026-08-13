@@ -80,7 +80,17 @@ async def entrypoint(ctx: agents.JobContext) -> None:
         vad=silero.VAD.load(),
         stt=openai.STT(model="gpt-4o-mini-transcribe"),
         llm=openai.LLM(model=CHAT_MODEL),
-        tts=openai.TTS(model="gpt-4o-mini-tts", voice="alloy"),
+        tts=openai.TTS(
+            model="gpt-4o-mini-tts",
+            voice="nova",
+            # gpt-4o-mini-tts supports style steering; this shapes delivery far
+            # more than the voice picker alone.
+            instructions=(
+                "Speak as a warm, upbeat travel concierge: natural conversational "
+                "pace, friendly and confident, with light enthusiasm when sharing "
+                "good options. Never robotic or monotone."
+            ),
+        ),
     )
     await session.start(room=ctx.room, agent=MeguazVoiceAgent())
     await session.generate_reply(

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { searchStays } from "@/lib/providers/stays";
-import { guard, failure } from "@/lib/security/guard";
+import { guard, failure, capExceeded } from "@/lib/security/guard";
+import { SpendCapError } from "@/lib/security/spend-cap";
+import { captureServerError } from "@/lib/monitoring";
 
 const schema = z.object({
   preference: z.enum(["home", "resort"]),
@@ -27,7 +29,8 @@ export async function POST(req: NextRequest) {
     const result = await searchStays(parsed.data);
     return NextResponse.json(result);
   } catch (err) {
-    console.error("stays search error", err instanceof Error ? err.message : "unknown");
+    if (err instanceof SpendCapError) return capExceeded();
+    captureServerError("stays-search", err);
     return failure("Stay search failed");
   }
 }

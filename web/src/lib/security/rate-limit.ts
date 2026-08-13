@@ -12,8 +12,10 @@ export type RateLimitResult = {
 export type Tier = keyof typeof TIERS;
 
 export const TIERS = {
-  // Cheap, deterministic provider calls
-  search: { anon: 20, auth: 60, windowSeconds: 60 },
+  // Cheap, deterministic provider calls. One screen can legitimately fire
+  // several of these at once (weather + ETA + reviews), so the anon budget
+  // covers a busy minute of real browsing, not just isolated clicks.
+  search: { anon: 40, auth: 80, windowSeconds: 60 },
   // Duffel offer requests — slow and quota-metered upstream
   solve: { anon: 6, auth: 20, windowSeconds: 60 },
   // LLM-backed, the most expensive per call

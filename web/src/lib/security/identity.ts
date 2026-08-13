@@ -35,9 +35,13 @@ export async function resolveCaller(req: NextRequest): Promise<Caller> {
 }
 
 function hashedIp(req: NextRequest): string {
-  // x-forwarded-for is set by Vercel/proxies; take the client-most entry.
+  // Behind Cloudflare's proxy, CF-Connecting-IP is set authoritatively at the
+  // edge. X-Forwarded-For is only APPENDED to there, so its first entry is
+  // client-spoofable — an attacker could rotate fake IPs to reset their own
+  // anonymous rate limit. Prefer Cloudflare's header, then fall back.
   const forwarded = req.headers.get("x-forwarded-for");
   const ip =
+    req.headers.get("cf-connecting-ip")?.trim() ||
     forwarded?.split(",")[0]?.trim() ||
     req.headers.get("x-real-ip") ||
     "unknown";

@@ -1,0 +1,5 @@
+{
+  "enabledPlugins": {
+    "hyperframes@claude-plugins-official": true
+  }
+}

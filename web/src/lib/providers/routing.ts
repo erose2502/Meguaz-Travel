@@ -1,4 +1,5 @@
 import "server-only";
+import { checkSpendCap } from "@/lib/security/spend-cap";
 
 // Drive-time ETA between two coordinates.
 //
@@ -19,11 +20,20 @@ export type DriveEta = {
 export async function driveEta(from: LatLng, to: LatLng, departAt?: Date): Promise<DriveEta> {
   const distanceKm = haversineKm(from, to);
 
-  if (process.env.GOOGLE_MAPS_API_KEY) {
+  // Live-traffic lookups are metered; when the global daily cap is reached we
+  // degrade to the free distance estimate instead of failing the request.
+  const hasProvider = Boolean(process.env.GOOGLE_MAPS_API_KEY || process.env.MAPBOX_TOKEN);
+  const underCap =
+    hasProvider &&
+    (await checkSpendCap("maps")
+      .then((c) => c.allowed)
+      .catch(() => false));
+
+  if (underCap && process.env.GOOGLE_MAPS_API_KEY) {
     const g = await googleRoutes(from, to, departAt).catch(() => null);
     if (g) return { ...g, distanceKm, source: "google", trafficAware: true };
   }
-  if (process.env.MAPBOX_TOKEN) {
+  if (underCap && process.env.MAPBOX_TOKEN) {
     const m = await mapbox(from, to).catch(() => null);
     if (m) return { ...m, distanceKm, source: "mapbox", trafficAware: true };
   }

@@ -34,6 +34,9 @@ export const env = {
   get supabaseServiceKey() {
     return required("SUPABASE_SERVICE_ROLE_KEY");
   },
+  get youtubeApiKey() {
+    return required("YOUTUBE_API_KEY");
+  },
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
   // Budget guards
   maxTokensPerSession: Number(process.env.MAX_TOKENS_PER_SESSION ?? 60_000),

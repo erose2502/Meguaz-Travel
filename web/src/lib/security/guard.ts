@@ -61,3 +61,15 @@ export async function guard(
 export function failure(message: string, status = 502) {
   return NextResponse.json({ error: message }, { status });
 }
+
+/**
+ * Response for a SpendCapError: the global daily ceiling for an upstream
+ * provider is reached, so the feature is paused rather than broken. 503 (not
+ * 429) because it is not the caller's fault and no caller behaviour fixes it.
+ */
+export function capExceeded() {
+  return NextResponse.json(
+    { error: "We've reached today's search capacity. Please try again later." },
+    { status: 503, headers: { "Retry-After": "3600" } }
+  );
+}

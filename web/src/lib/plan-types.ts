@@ -11,12 +11,24 @@ export type StepIcon =
   | "door"
   | "train";
 
+/** How the traveller gets to their departure airport. */
+export type TransferMode = "rideshare" | "drive" | "dropoff" | "transit";
+
 export type TripBrief = {
   from: string; // city, e.g. "San Francisco"
   to: string; // city, e.g. "London"
   arriveBy: string; // YYYY-MM-DD
   budget: number; // USD cap
   adults: number;
+  /** Airport-transfer preference; defaults to rideshare. */
+  airportTransfer?: TransferMode;
+  /**
+   * Trip length in nights. When present the solver prices the return leg too
+   * (one Duffel round-trip request, not two), so `cost` is the whole trip.
+   */
+  nights?: number;
+  /** Fare class the traveller wants priced. */
+  cabinClass?: "economy" | "premium_economy" | "business" | "first";
   // When present, the solver uses a real drive ETA from here to the departure
   // airport instead of a static estimate, sharpening "leave home by".
   originCoords?: { lat: number; lng: number };
@@ -65,10 +77,25 @@ export type PlanOption = {
   preTransferMin: number;
 };
 
+/** Median nightly stay estimate for the trip window, from live listings. */
+export type StayEstimate = {
+  nightlyUsd: number;
+  nights: number;
+  totalUsd: number;
+  kind: "airbnb" | "resort" | "hotel";
+};
+
 export type SolveResponse = {
   brief: TripBrief;
   routeLabel: string; // "San Francisco → London"
   /** False when no itinerary lands before the arrive-by deadline; UI warns. */
   meetsDeadline: boolean;
+  /** YYYY-MM-DD of the priced return leg, when the brief carried a trip length. */
+  returnDate: string | null;
+  /** Null when no trip length was given or no priced listings came back. */
+  stay: StayEstimate | null;
+  /** Set when the ride to the departure airport is extreme and a materially
+   * closer airport exists — surfaced so the traveller can switch. */
+  originAdvice: string | null;
   options: PlanOption[];
 };

@@ -1,5 +1,6 @@
 import { Duffel } from "@duffel/api";
 import { env } from "@/lib/env";
+import { assertSpendCap } from "@/lib/security/spend-cap";
 
 let _duffel: Duffel | null = null;
 function duffel() {
@@ -33,6 +34,7 @@ export type FlightOffer = {
 };
 
 export async function searchFlights(params: FlightSearchParams): Promise<FlightOffer[]> {
+  await assertSpendCap("duffel");
   const slice = (origin: string, destination: string, departure_date: string) => ({
     origin,
     destination,
@@ -77,6 +79,7 @@ export async function searchFlights(params: FlightSearchParams): Promise<FlightO
 // Resolve a free-text city to its main airport IATA code via Duffel Places.
 export async function resolveIata(query: string): Promise<string | null> {
   if (/^[A-Za-z]{3}$/.test(query.trim())) return query.trim().toUpperCase();
+  await assertSpendCap("duffel");
   const res = await fetch(
     `https://api.duffel.com/places/suggestions?query=${encodeURIComponent(query)}`,
     {
@@ -132,6 +135,7 @@ export type ResortResult = {
 };
 
 export async function searchResorts(params: StaySearchParams): Promise<ResortResult[]> {
+  await assertSpendCap("duffel");
   const body = {
     location: {
       radius: 15,

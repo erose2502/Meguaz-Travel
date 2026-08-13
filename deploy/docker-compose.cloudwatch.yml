@@ -1,0 +1,16 @@
+# Opt-in CloudWatch log shipping for the backend's structured JSON logs.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.cloudwatch.yml up -d
+#
+# Prerequisite: the EC2 instance profile needs logs:CreateLogGroup,
+# logs:CreateLogStream and logs:PutLogEvents (e.g. the managed policy
+# CloudWatchAgentServerPolicy). Set AWS_REGION in deploy/.env if the instance
+# is not in us-east-1.
+services:
+  web:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: meguaz-web
+        awslogs-create-group: "true"

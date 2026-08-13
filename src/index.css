@@ -1,171 +1,430 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap');
 @import 'tailwindcss';
 
-@theme {
-  --font-display: 'DM Serif Display', serif;
-  --font-body: 'Inter', sans-serif;
-  /* Meguaz brand palette */
-  --color-navy: #0D1B2A;
-  --color-navy-deep: #071320;
-  --color-teal: #146C7E;
-  --color-teal-bright: #2FB4B4;
-  --color-teal-light: #6FD0D0;
-  --color-teal-pale: #CFEDED;
-  --color-orange: #FF7A00;
-  --color-amber: #FFC857;
-  --color-cream: #F6F3EA;
-  --color-cream-light: #FFFDF8;
-  /* Aliases kept so existing utility classes keep resolving */
-  --color-sky-deep: #0D1B2A;
-  --color-sky-mid: #146C7E;
-  --color-sky-blue: #2FB4B4;
-  --color-sky-light: #6FD0D0;
-  --color-sand: #F6F3EA;
-  --color-sage: #2FB4B4;
-  --color-coral: #FF7A00;
+/* Organic — design-system tokens and component classes, ported from the
+   Meguaz design project (_ds/organic-7e824690). This file is the source of
+   truth for the system's look; retune it here. */
+
+:root {
+  --color-bg: #f5ead8;
+  --color-surface: #ebddc5;
+  --color-text: #201e1d;
+  --color-accent: #c67139;
+  /* The oasis axis: the second accent is lagoon water, not dry sage. Every
+     "calm/positive" surface in the app drinks from this ramp. */
+  --color-accent-2: #3f7f77;
+  --color-divider: color-mix(in srgb, #201e1d 16%, transparent);
+
+  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
+     same step of any role matches the others in visual value. */
+  --color-neutral-100: #f9f4ed;
+  --color-neutral-200: #eee7db;
+  --color-neutral-300: #dcd3c4;
+  --color-neutral-400: #c0b6a5;
+  --color-neutral-500: #a19786;
+  --color-neutral-600: #82796a;
+  --color-neutral-700: #645c50;
+  --color-neutral-800: #474238;
+  --color-neutral-900: #2e2b25;
+
+  --color-accent-100: #fff2eb;
+  --color-accent-200: #ffe1d0;
+  --color-accent-300: #ffc6a5;
+  --color-accent-400: #f6a06b;
+  --color-accent-500: #d67f48;
+  --color-accent-600: #b2622d;
+  --color-accent-700: #8c491a;
+  --color-accent-800: #643312;
+  --color-accent-900: #402310;
+
+  --color-accent-2-100: #e6f6f2;
+  --color-accent-2-200: #cdeae3;
+  --color-accent-2-300: #abd6cd;
+  --color-accent-2-400: #83bab0;
+  --color-accent-2-500: #629b92;
+  --color-accent-2-600: #467d75;
+  --color-accent-2-700: #305f59;
+  --color-accent-2-800: #1f443f;
+  --color-accent-2-900: #142b28;
+
+  --font-heading: 'Caprasimo', system-ui, sans-serif;
+  --font-heading-weight: 400;
+  --font-body: 'Figtree', system-ui, sans-serif;
+
+  --space-1: 4.4px;
+  --space-2: 8.8px;
+  --space-3: 13.2px;
+  --space-4: 17.6px;
+  --space-6: 26.4px;
+  --space-8: 35.2px;
+
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 28px;
+
+  /* Elevation — soft ink-tinted shadows derived from the ground. */
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #2e2b25 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #2e2b25 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #2e2b25 22%, transparent);
 }
 
-* {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
-*::-webkit-scrollbar {
-  display: none;
+
+html,
+body {
+  margin: 0;
+  background: var(--color-bg);
+  /* iOS Safari inflates text on pages it deems "desktop", which blows rows
+     past the viewport. Pin it. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Nothing may create a horizontal page scroll; wide content must wrap.
+     `hidden` rather than `clip` — older iOS Safari ignores clip. */
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* iOS zooms the whole page when focusing an input whose font is under 16px —
+   and the zoom sticks, cutting off the right side of every screen after.
+   Inline styles set 14px for desktop aesthetics; on touch screens 16px wins. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 body {
-  font-family: 'Inter', sans-serif;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
+  /* Oasis air: late sun pooling from above, lagoon glow rising from below.
+     Fixed, so scrolling moves the content through the light. */
+  background:
+    radial-gradient(120% 70% at 85% -12%, rgba(255, 210, 158, 0.5), transparent 58%),
+    radial-gradient(95% 60% at 8% 110%, rgba(63, 127, 119, 0.17), transparent 60%),
+    radial-gradient(70% 45% at 92% 96%, rgba(47, 180, 180, 0.1), transparent 62%),
+    var(--color-bg);
+  background-attachment: fixed;
 }
 
-.font-display {
-  font-family: 'DM Serif Display', serif;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  margin: 0 0 var(--space-2);
+}
+h1 { font-size: 42px; }
+h2 { font-size: 32px; }
+h3 { font-size: 25px; }
+h4 { font-size: 20px; }
+h5 { font-size: 16px; }
+h6 {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+p { margin: 0 0 var(--space-3); }
+
+a {
+  color: var(--color-accent);
+  text-underline-offset: 3px;
+}
+a:hover { color: var(--color-accent-700); }
+
+img { display: block; max-width: 100%; }
+figure { margin: 0; }
+figcaption {
+  font-size: 11px;
+  margin-top: var(--space-1);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+button { font-family: var(--font-body); }
+
+.text-muted { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
+/* Photography keeps its own life; the warm ground does the harmonising. */
+.washed { filter: saturate(1.06) contrast(1.04); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Glass surfaces — one system, six weights.
+
+   Real glass reads from three things at once: what shows through it (a strong
+   blur plus saturation lift), the light caught on its top edge (the inset
+   highlight), and the shadow it casts (long, soft, offset down). Every panel
+   in the app pulls from here so those three stay in step.
+   ══════════════════════════════════════════════════════════════════════ */
+.glass,
+.glass-strong,
+.glass-soft,
+.glass-accent,
+.glass-sage,
+.glass-dark {
+  position: relative;
+  background-image: linear-gradient(
+    148deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.08) 46%,
+    rgba(255, 255, 255, 0.24) 100%
+  );
+  backdrop-filter: blur(30px) saturate(185%);
+  -webkit-backdrop-filter: blur(30px) saturate(185%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.22),
+    0 24px 48px -24px rgba(46, 43, 37, 0.4),
+    0 2px 6px -3px rgba(46, 43, 37, 0.14);
 }
 
-.glass {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+.glass { background-color: rgba(255, 251, 244, 0.46); }
+
+.glass-strong {
+  background-color: rgba(255, 252, 246, 0.64);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.25),
+    0 32px 64px -28px rgba(46, 43, 37, 0.45),
+    0 2px 6px -3px rgba(46, 43, 37, 0.14);
 }
+
+.glass-soft {
+  background-color: rgba(255, 251, 244, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 30px -20px rgba(46, 43, 37, 0.32);
+}
+
+.glass-accent {
+  background-color: rgba(255, 216, 190, 0.44);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.glass-sage { background-color: rgba(183, 226, 216, 0.4); }
 
 .glass-dark {
-  background: rgba(13, 27, 42, 0.4);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: rgba(36, 33, 28, 0.74);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--color-neutral-100);
+  background-image: linear-gradient(
+    148deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.02) 46%,
+    rgba(255, 255, 255, 0.07) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 28px 56px -26px rgba(0, 0, 0, 0.6);
 }
 
-.glass-light {
-  background: rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+/* Menus and popovers are NOT glass.
+   Translucency is fine for panels that sit in the page, but a floating menu
+   has to be read against whatever it happens to cover — so these are nearly
+   opaque, with a hard edge and a deep shadow to separate them from the page. */
+.popover {
+  background: rgba(255, 252, 247, 0.985);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(46, 43, 37, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 6px -2px rgba(46, 43, 37, 0.18),
+    0 24px 48px -16px rgba(46, 43, 37, 0.42);
 }
 
-/* Frosted white card for the light (cream) home surface */
-.glass-card {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 10px 30px -12px rgba(13, 27, 42, 0.18);
+/* Interactive glass lifts toward the light on hover. */
+.glass-lift {
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    box-shadow 260ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    background-color 260ms ease;
+  cursor: pointer;
 }
+.glass-lift:hover {
+  transform: translateY(-3px);
+  background-color: rgba(255, 253, 249, 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 34px 62px -26px rgba(46, 43, 37, 0.46),
+    0 3px 10px -4px rgba(46, 43, 37, 0.18);
+}
+.glass-lift:active { transform: translateY(-1px); }
 
-/* Frosted glass over photography (headers, search bar on hero) */
-.glass-onimage {
-  background: rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(16px) saturate(130%);
-  -webkit-backdrop-filter: blur(16px) saturate(130%);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-12px); }
-}
-
-@keyframes drift {
-  0% { transform: translateX(0px); }
-  50% { transform: translateX(20px); }
-  100% { transform: translateX(0px); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
-
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-
-.animate-drift {
-  animation: drift 12s ease-in-out infinite;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 3s ease-in-out infinite;
-}
-
-.shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
-  background-size: 200% auto;
-  animation: shimmer 2s linear infinite;
-}
-
-/* Scroll-reveal utility — works in any scroll container */
-.io-reveal {
-  opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: opacity, transform;
-}
-.io-revealed {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Seamless screen transition — applied when a screen mounts */
-@keyframes screen-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.995); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.animate-screen {
-  animation: screen-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-/* Gentle rise used for hero elements on first paint */
-@keyframes rise-in {
-  from { opacity: 0; transform: translateY(18px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.animate-rise {
-  animation: rise-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .io-reveal { opacity: 1; transform: none; transition: none; }
-  .animate-screen, .animate-rise, .animate-float, .animate-drift, .animate-pulse-glow { animation: none; }
-}
-
-.lottie-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-}
-
-.lottie-placeholder::after {
+/* A trace of grain keeps large translucent fields from banding. */
+.grain::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 60%);
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+}
+
+/* — tags — */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
+.tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
+.tag-neutral { background: var(--color-neutral-100); color: var(--color-neutral-800); }
+.tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+
+/* — segmented control — */
+.seg {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--color-divider);
+  border-radius: 999px;
+}
+.seg-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.seg-opt + .seg-opt { border-left: 1px solid var(--color-divider); }
+.seg-opt input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
   pointer-events: none;
 }
+.seg-opt:has(input:checked) { background: var(--color-accent); color: var(--color-bg); }
+.seg-opt:not(:has(input:checked)):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.seg-opt:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+
+@keyframes mg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mg-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* — carousel rail: native touch scroll with snap; arrows on pointer devices — */
+.mg-rail {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.mg-rail::-webkit-scrollbar {
+  display: none;
+}
+.mg-rail > * {
+  scroll-snap-align: start;
+}
+.mg-rail-arrow {
+  display: none;
+}
+@media (min-width: 768px) {
+  .mg-rail-arrow {
+    display: flex;
+  }
+}
+
+/* Rotating hero facts rise gently into place on each swap. */
+@keyframes mg-fact-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.mg-fact {
+  animation: mg-fact-in 700ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Typewriter caret for the fact ticker. */
+@keyframes mg-caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.mg-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--color-accent-300);
+  animation: mg-caret-blink 900ms steps(1) infinite;
+}
+
+/* Voice bars on the agent call sheet only move while the call is live. */
+@keyframes mg-wave {
+  0%,
+  100% {
+    transform: scaleY(0.55);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* — hover states for the inline-styled controls the design specifies with
+     style-hover; !important so they beat the element's own inline background — */
+.hv-white:hover { background: #ffffff !important; }
+.hv-soft:hover { background: rgba(255, 255, 255, 0.5) !important; }
+.hv-accent:hover { background: var(--color-accent-600) !important; }
+.hv-accent-900:hover { background: var(--color-accent-900) !important; }

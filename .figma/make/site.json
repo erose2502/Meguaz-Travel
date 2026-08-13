@@ -1,0 +1,11 @@
+{
+  "title": "Meguaz — Your journey, perfected",
+  "description": "Personalized travel plans built around your budget and your time: three ways to get there, a door-to-door plan, and the phrases you need when you land.",
+  "language": "en",
+  "icons": {
+    "icon": "/favicon.png"
+  },
+  "openGraph": {
+    "image": "https://www.meguaz.com/og.jpg"
+  }
+}

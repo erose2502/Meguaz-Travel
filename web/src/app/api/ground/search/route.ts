@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { searchGround } from "@/lib/providers/ground";
-import { guard, failure } from "@/lib/security/guard";
+import { guard, failure, capExceeded } from "@/lib/security/guard";
+import { SpendCapError } from "@/lib/security/spend-cap";
+import { captureServerError } from "@/lib/monitoring";
 
 const schema = z.object({
   origin: z.string().min(2).max(120),
@@ -23,7 +25,8 @@ export async function POST(req: NextRequest) {
     const options = await searchGround(parsed.data);
     return NextResponse.json({ options });
   } catch (err) {
-    console.error("ground search error", err instanceof Error ? err.message : "unknown");
+    if (err instanceof SpendCapError) return capExceeded();
+    captureServerError("ground-search", err);
     return failure("Ground transport search failed");
   }
 }

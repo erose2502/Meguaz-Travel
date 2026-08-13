@@ -1,0 +1,20 @@
+export type Screen =
+  | 'home'
+  | 'plans'
+  | 'planner'
+  | 'journey'
+  | 'locked'
+  | 'trips'
+  | 'community'
+  | 'profile'
+  | 'onboarding'
+  | 'phrases'
+  | 'briefing'
+  | 'account'
+  | 'stays'
+  | 'terms'
+  | 'privacy'
+
+export type Priority = 'Save money' | 'Balanced' | 'Save time'
+
+export type CallState = 'idle' | 'connecting' | 'live'

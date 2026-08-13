@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { runChat } from "@/lib/orchestrator/router";
-import { guard, failure } from "@/lib/security/guard";
+import { guard, failure, capExceeded } from "@/lib/security/guard";
+import { SpendCapError } from "@/lib/security/spend-cap";
+import { captureServerError } from "@/lib/monitoring";
 
 // sessionId is accepted for client continuity but is NOT trusted for budgeting
 // or identity — spend is tracked against the server-resolved caller.
@@ -31,7 +33,8 @@ export async function POST(req: NextRequest) {
     const result = await runChat(parsed.data.messages, g.caller.key);
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
-    console.error("chat route error", err instanceof Error ? err.message : "unknown");
+    if (err instanceof SpendCapError) return capExceeded();
+    captureServerError("chat", err);
     return failure("Chat temporarily unavailable");
   }
 }

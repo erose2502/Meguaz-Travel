@@ -1,109 +1,667 @@
-import { useState, useEffect } from 'react'
-import OnboardingFlow from './components/OnboardingFlow'
-import LandingPage from './components/LandingPage'
-import SearchResults from './components/SearchResults'
-import JourneyTimeline from './components/JourneyTimeline'
-import BookingConfirmation from './components/BookingConfirmation'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { gsap } from 'gsap'
+import BackdropReel from './components/BackdropReel'
+import Header from './components/Header'
+import Icon from './components/Icon'
+import MobileNav from './components/MobileNav'
+
+// LiveKit's client library is ~1MB; load it only when a call actually starts.
+const AgentCall = lazy(() => import('./components/AgentCall'))
+import HomeScreen from './components/HomeScreen'
+import PlansScreen from './components/PlansScreen'
+import PlannerScreen from './components/PlannerScreen'
+import JourneyScreen from './components/JourneyScreen'
+import LockedScreen from './components/LockedScreen'
 import TripsScreen from './components/TripsScreen'
+import CommunityScreen from './components/CommunityScreen'
 import ProfileScreen from './components/ProfileScreen'
-import BottomNav from './components/BottomNav'
+import OnboardingScreen from './components/OnboardingScreen'
+import PhrasesScreen, { type PhraseCard } from './components/PhrasesScreen'
+import BriefingScreen from './components/BriefingScreen'
+import AuthGate from './components/AuthGate'
+import LegalScreen from './components/LegalScreen'
+import ConsentBanner from './components/ConsentBanner'
+import MusicDock from './components/MusicDock'
+import { DESTINATIONS } from './data/destinations'
+import { DEST_HERO_CLIPS } from './data/media'
+import { PHRASES, SPEECH_TAGS } from './data/phrases'
+import { sceneUrls } from './data/scenes'
+import { searchDestinations } from './lib/search'
+import { createTrip, type CabinClass, type PlanOption, type TransferMode, type TripBrief } from './lib/api'
+import { useLiveLeaveBy, useTripPlan } from './lib/useTripPlan'
+import { useHomeCity } from './lib/useHomeCity'
+import { useAccount } from './lib/useAccount'
+import { useTrips } from './lib/useTrips'
+import type { CallState, Priority, Screen } from './types'
 
-type Screen = 'onboarding' | 'landing' | 'search' | 'journey' | 'confirmation' | 'trips' | 'profile'
+type AppProps = {
+  defaultPriority?: Priority
+  mobileBreakpoint?: number
+  sceneClipUrls?: string
+  /** City the traveller departs from; the solver resolves it to an airport. */
+  homeCity?: string
+}
 
-const SHOW_ONBOARDING_KEY = 'wayfar_onboarded'
+type Bloom = {
+  size: number
+  blur: number
+  opacity: number
+  color: string
+  top?: number | string
+  left?: number | string
+  right?: number | string
+  bottom?: number | string
+}
 
-export default function App() {
-  const [screen, setScreen] = useState<Screen>('onboarding')
-  const [isMobile, setIsMobile] = useState(false)
+// Oasis atmosphere: sun-warmed sand up top, lagoon water gathering low.
+const BLOOMS: Bloom[] = [
+  { size: 640, blur: 110, opacity: 0.62, color: '#ffb384', top: -180, left: -140 },
+  { size: 420, blur: 100, opacity: 0.45, color: '#f6cf8f', top: '6%', left: '34%' },
+  { size: 580, blur: 120, opacity: 0.5, color: '#8fd0c5', top: '34%', right: -200 },
+  { size: 500, blur: 110, opacity: 0.5, color: '#ffc9a8', bottom: -240, left: '26%' },
+  { size: 380, blur: 120, opacity: 0.4, color: '#5fa8a0', bottom: '10%', right: '20%' },
+]
+
+const STYLE_TO_PRIORITY: Record<string, Priority> = {
+  saver: 'Save money',
+  balanced: 'Balanced',
+  comfort: 'Save time',
+}
+const PRIORITY_TO_STYLE: Record<Priority, 'saver' | 'balanced' | 'comfort'> = {
+  'Save money': 'saver',
+  Balanced: 'balanced',
+  'Save time': 'comfort',
+}
+
+function isoInDays(days: number) {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+export default function App({
+  defaultPriority = 'Balanced',
+  mobileBreakpoint = 768,
+  sceneClipUrls = '',
+  homeCity = 'San Francisco',
+}: AppProps) {
+  const [screen, setScreen] = useState<Screen>('home')
+  const [priority, setPriority] = useState<Priority>(defaultPriority)
+  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
+  const [query, setQuery] = useState('')
+  const [destCode, setDestCode] = useState<string | null>(null)
+  const [call, setCall] = useState<CallState>('idle')
+  const [shown, setShown] = useState<Record<string, boolean>>({})
+  const [learned, setLearned] = useState<Record<string, boolean>>({})
+
+  // The editable trip brief that every backend call is built from.
+  const [arriveBy, setArriveBy] = useState(() => isoInDays(14))
+  const [nights, setNights] = useState(5)
+  const [budget, setBudget] = useState(900)
+  const [adults, setAdults] = useState(1)
+  const [planActive, setPlanActive] = useState(false)
+  const [selected, setSelected] = useState<PlanOption | null>(null)
+
+  const [companions, setCompanions] = useState<string[]>([])
+  const [cabinClass, setCabinClass] = useState<CabinClass>('economy')
+  const [transfer, setTransfer] = useState<TransferMode>('rideshare')
+  const [originIata, setOriginIata] = useState<string | null>(null)
+  const account = useAccount()
+  const tripsState = useTrips(!!account.user)
+  const prefsApplied = useRef(false)
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
+    const onResize = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    onResize()
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  // Motion: each screen's sections rise into place; the ambient blooms drift
+  // like light on water. Both stand down for prefers-reduced-motion.
+  const stageRef = useRef<HTMLDivElement>(null)
+  const reducedMotion = () =>
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
   useEffect(() => {
-    if (sessionStorage.getItem(SHOW_ONBOARDING_KEY)) {
-      setScreen('landing')
+    if (reducedMotion()) return
+    const surface = stageRef.current?.querySelector('[data-screen-label]')
+    if (!surface) return
+    const kids = Array.from(surface.children).slice(0, 12)
+    const tween = gsap.fromTo(
+      kids,
+      { autoAlpha: 0, y: 16 },
+      {
+        autoAlpha: 1,
+        y: 0,
+        duration: 0.5,
+        stagger: 0.06,
+        ease: 'power2.out',
+        // NEVER 'all': that wipes React's inline styles (display:grid, etc.)
+        // off the animated elements and React won't re-apply them.
+        clearProps: 'transform,opacity,visibility',
+      },
+    )
+    return () => {
+      tween.kill()
     }
+  }, [screen])
+
+  useEffect(() => {
+    if (reducedMotion()) return
+    const tweens = gsap.utils.toArray<HTMLElement>('.mg-bloom').map((el, i) =>
+      gsap.to(el, {
+        x: (i % 2 ? -1 : 1) * 42,
+        y: (i % 3 ? 1 : -1) * 32,
+        duration: 16 + i * 4,
+        yoyo: true,
+        repeat: -1,
+        ease: 'sine.inOut',
+      }),
+    )
+    return () => tweens.forEach((t) => t.kill())
   }, [])
 
-  const handleOnboardingComplete = () => {
-    sessionStorage.setItem(SHOW_ONBOARDING_KEY, '1')
-    setScreen('landing')
+  const go = (next: Screen) => () => {
+    if (next === 'planner') setPlanActive(true)
+    setScreen(next)
+    window.scrollTo(0, 0)
   }
 
-  const showNav = screen !== 'onboarding' && screen !== 'confirmation'
+  // The call card owns the real LiveKit connection lifecycle; App only tracks
+  // whether the call surface is open.
+  const connectAgent = () => setCall('live')
+  const endCall = () => setCall('idle')
 
-  // Search & journey are steps inside the booking flow, not top-level destinations,
-  // so no bottom-nav tab is highlighted while the user is mid-flow.
-  const navScreenId =
-    screen === 'landing' || screen === 'trips' || screen === 'profile' ? screen : ''
+  const isMobile = width < mobileBreakpoint
+  const dest = destCode ? (DESTINATIONS.find((d) => d.code === destCode) ?? null) : null
+  const matches = useMemo(() => searchDestinations(query, DESTINATIONS), [query])
+  // Generated Seedream/Z-Image scenes, served from our own media dir — no
+  // third-party image API at runtime.
+  const scenes = dest ? sceneUrls(dest.code) : []
+
+  const home = useHomeCity(homeCity)
+  // An IATA code is unambiguous; a city name is not ("Reading" resolves to
+  // Redding, California). Prefer the chosen airport whenever we have one.
+  const departure = originIata || home.airports[0]?.iata || home.resolvedCity
+  // Only send coordinates when they actually describe the departure airport.
+  // Falling back to a home-city name while still sending the device location
+  // makes the solver price a drive between two unrelated places.
+  const departureIsNearby = home.airports.some((a) => a.iata === departure)
+  const brief: TripBrief = {
+    from: departure,
+    to: dest?.city ?? '',
+    arriveBy,
+    budget,
+    adults,
+    nights,
+    airportTransfer: transfer,
+    cabinClass,
+    ...(home.coords && departureIsNearby ? { originCoords: home.coords } : {}),
+  }
+  const { plan, loading, refreshing, error, lastUpdated, refresh } = useTripPlan(brief, planActive)
+  const live = useLiveLeaveBy(selected, screen === 'journey')
+
+  useEffect(() => {
+    const profile = account.profile
+    if (!profile || prefsApplied.current) return
+    prefsApplied.current = true
+    if (profile.home_airport) setOriginIata(profile.home_airport)
+    if (profile.travel_style && STYLE_TO_PRIORITY[profile.travel_style]) {
+      setPriority(STYLE_TO_PRIORITY[profile.travel_style])
+    }
+    if (profile.preferred_cabin) setCabinClass(profile.preferred_cabin)
+    if (profile.default_budget_usd) setBudget(Number(profile.default_budget_usd))
+  }, [account.profile])
+
+  // Booking is what teaches the planner how this traveller actually travels.
+  const rememberPreferences = () => {
+    if (!account.user) return
+    account
+      .savePreferences({
+        homeAirport: originIata || home.airports[0]?.iata || null,
+        travelStyle: PRIORITY_TO_STYLE[priority],
+        preferredCabin: cabinClass,
+        defaultBudgetUsd: budget,
+      })
+      .catch(() => {
+        /* preferences are a nicety; never block the booking on them */
+      })
+  }
+
+  const LANE: Record<string, 'saver' | 'balanced' | 'comfort'> = {
+    money: 'saver',
+    balanced: 'balanced',
+    time: 'comfort',
+  }
+
+  const persistTrip = () => {
+    if (!account.user || !selected || !dest) return
+    createTrip({
+      title: departure + ' → ' + dest.city,
+      destination: dest.city,
+      origin: departure,
+      arriveBy,
+      adults,
+      budgetUsd: budget,
+      estimatedTotalUsd: selected.cost,
+      costLane: LANE[selected.fits] ?? 'balanced',
+      brief: {
+        cabinClass,
+        nights,
+        airportTransfer: transfer,
+        leaveBy: selected.leaveBy,
+        doorToDoor: selected.doorToDoor,
+        offerId: selected.offerId,
+        route: selected.name,
+        destinationCode: dest.code,
+      },
+    })
+      .then(() => tripsState.reload())
+      .catch(() => {
+        /* the plan is still locked on screen; the save can be retried */
+      })
+  }
+
+  const lockPlan = () => {
+    if (account.user) {
+      rememberPreferences()
+      persistTrip()
+      go('locked')()
+    } else {
+      go('account')()
+    }
+  }
+
+  // A fresh solve invalidates the previously selected option.
+  useEffect(() => {
+    if (!plan) return
+    setSelected((prev) => (prev ? plan.options.find((o) => o.id === prev.id) || prev : null))
+  }, [plan])
+
+  const originAirport = plan?.options[0]?.originAirport || originIata || home.airports[0]?.iata || 'SFO'
+
+  // A curated plan card is a pre-filled brief: set the destination (and trip
+  // length when the plan carries one) and go straight into a live solve. No
+  // fares are fetched until this moment — browsing is free.
+  const pickPlan = (code: string, planNights?: number) => {
+    setDestCode(code)
+    if (planNights) setNights(planNights)
+    go('planner')()
+  }
+
+  const list = dest ? PHRASES[dest.lang] || [] : []
+  const phrases: PhraseCard[] = list.map((p, i) => {
+    const key = (dest?.lang ?? '') + i
+    return {
+      ...p,
+      n: String(i + 1),
+      shown: !!shown[key],
+      learned: !!learned[key],
+      toggleShown: () => setShown((prev) => ({ ...prev, [key]: !prev[key] })),
+      toggleLearned: () => setLearned((prev) => ({ ...prev, [key]: !prev[key] })),
+    }
+  })
+  const learnedCount = phrases.filter((p) => p.learned).length
+
+  const clips = sceneClipUrls
+    .split(/[\s,]+/)
+    .filter((u) => /^https?:\/\//.test(u))
+    .slice(0, 3)
+    .map((src, i) => ({
+      src,
+      label: 'Scene ' + (i + 1),
+      note: [
+        'Arriving in ' + (dest?.city ?? '') + ' — the view that meets you first.',
+        'Street level in ' + (dest?.city ?? '') + ', where the trip actually happens.',
+        (dest?.city ?? '') + '’s landmarks, worth the detour on your way through.',
+      ][i],
+    }))
 
   return (
-    <div className="relative w-full min-h-dvh overflow-hidden" style={{ fontFamily: "'Inter', sans-serif", background: '#071320' }}>
-      <div key={screen} className="animate-screen">
-      {screen === 'onboarding' && (
-        <OnboardingFlow onComplete={handleOnboardingComplete} />
-      )}
-
-      {screen === 'landing' && (
-        <LandingPage
-          onSearch={() => setScreen('search')}
-          isMobile={isMobile}
-        />
-      )}
-
-      {screen === 'search' && (
-        <div className="overflow-y-auto h-dvh">
-          <SearchResults
-            onSelect={() => setScreen('journey')}
-            onBack={() => setScreen('landing')}
-            isMobile={isMobile}
+    <div
+      style={{
+        position: 'relative',
+        minHeight: '100vh',
+        background: 'var(--color-bg)',
+        color: 'var(--color-text)',
+        fontFamily: 'var(--font-body)',
+        overflowX: 'hidden',
+      }}
+    >
+      {/* The living background: cinematic reel → oasis blooms → legibility
+          veil. All fixed; every screen floats above the same moving light. */}
+      <BackdropReel
+        scenes={scenes}
+        destCity={dest?.city ?? null}
+        destClip={dest ? (DEST_HERO_CLIPS[dest.code] ?? null) : null}
+      />
+      <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+        {BLOOMS.map((bloom, i) => (
+          <span
+            key={i}
+            className="mg-bloom"
+            style={{
+              position: 'absolute',
+              width: bloom.size,
+              height: bloom.size,
+              top: bloom.top,
+              left: bloom.left,
+              right: bloom.right,
+              bottom: bloom.bottom,
+              borderRadius: '50%',
+              background: bloom.color,
+              filter: 'blur(' + bloom.blur + 'px)',
+              opacity: bloom.opacity * 0.55,
+            }}
           />
-        </div>
-      )}
-
-      {screen === 'journey' && (
-        <div className="overflow-y-auto h-dvh">
-          <JourneyTimeline
-            onBack={() => setScreen('search')}
-            onBook={() => setScreen('confirmation')}
-            isMobile={isMobile}
-          />
-        </div>
-      )}
-
-      {screen === 'confirmation' && (
-        <div className="overflow-y-auto h-dvh">
-          <BookingConfirmation onDone={() => setScreen('landing')} />
-        </div>
-      )}
-
-      {screen === 'trips' && (
-        <div className="overflow-y-auto h-dvh">
-          <TripsScreen onOpenJourney={() => setScreen('journey')} isMobile={isMobile} />
-        </div>
-      )}
-
-      {screen === 'profile' && (
-        <div className="overflow-y-auto h-dvh">
-          <ProfileScreen isMobile={isMobile} />
-        </div>
-      )}
+        ))}
       </div>
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: 'none',
+          transition: 'background 600ms ease',
+          // Home earns the cinematic view; every working screen sits on a much
+          // calmer wash so panels and text stay crisp over the moving footage.
+          background:
+            screen === 'home'
+              ? 'linear-gradient(180deg, rgba(24,20,16,0.38) 0%, rgba(24,20,16,0.12) 24%, rgba(245,234,216,0.55) 52%, rgba(245,234,216,0.86) 76%, rgba(245,234,216,0.93) 100%)'
+              : 'linear-gradient(180deg, rgba(24,20,16,0.2) 0%, rgba(245,234,216,0.8) 22%, rgba(245,234,216,0.94) 55%, rgba(245,234,216,0.96) 100%)',
+        }}
+      />
 
-      {showNav && (
-        <BottomNav
-          screen={navScreenId}
-          onNavigate={(id) => {
-            if (id === 'landing') setScreen('landing')
-            else if (id === 'trips') setScreen('trips')
-            else if (id === 'profile') setScreen('profile')
-          }}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Header
+          screen={screen}
+          isWide={!isMobile}
+          onNavigate={(next) => go(next)()}
+          onConnectAgent={connectAgent}
+          user={account.user}
+          avatarUrl={account.profile?.avatar_url ?? null}
+          onAccount={account.user ? go('profile') : go('account')}
         />
-      )}
+
+        <div
+          ref={stageRef}
+          style={{
+            maxWidth: 1280,
+            margin: '0 auto',
+            padding: 'clamp(12px,1.6vw,20px) clamp(12px,2vw,24px) ' + (isMobile ? '110px' : '48px'),
+          }}
+        >
+          {screen === 'home' && (
+            <HomeScreen
+              dest={dest}
+              query={query}
+              onQuery={setQuery}
+              matches={matches}
+              onPick={(d) => setDestCode(d.code)}
+              arriveBy={arriveBy}
+              onArriveBy={setArriveBy}
+              nights={nights}
+              onNights={setNights}
+              budget={budget}
+              onBudget={setBudget}
+              adults={adults}
+              onAdults={setAdults}
+              companions={companions}
+              onCompanions={setCompanions}
+              originCity={home.resolvedCity}
+              originIsLive={home.status === 'resolved'}
+              originLocating={home.status === 'locating'}
+              airports={home.airports}
+              originIata={originIata}
+              onOriginIata={setOriginIata}
+              originCoords={home.coords}
+              cabinClass={cabinClass}
+              onCabinClass={setCabinClass}
+              transfer={transfer}
+              onTransfer={setTransfer}
+              onSolve={go('planner')}
+              solving={loading}
+              originAirport={originAirport}
+              priority={priority}
+              trips={tripsState.trips}
+              signedIn={!!account.user}
+              hasPhrasePack={!!dest && !!PHRASES[dest.lang]}
+              phraseKicker={(dest?.lang ?? '') + ' · six phrases'}
+              phrasesSaved={learnedCount}
+              phrasesTotal={phrases.length}
+              sceneSubhead={
+                clips.length
+                  ? 'Your generated clips — looping preview'
+                  : 'Cinematic scenes · generated'
+              }
+              clips={clips}
+              scenes={scenes}
+              showStills={clips.length === 0 && scenes.length >= 3}
+              scenesLoading={false}
+              goPlanner={go('planner')}
+              goPlans={go('plans')}
+              onPickPlan={pickPlan}
+              goJourney={go('journey')}
+              goPhrases={go('phrases')}
+              goTrips={go('trips')}
+              goBriefing={go('briefing')}
+            />
+          )}
+
+          {screen === 'plans' && <PlansScreen onPick={pickPlan} goHome={go('home')} />}
+
+          {screen === 'planner' && (
+            <PlannerScreen
+              plan={plan}
+              loading={loading}
+              refreshing={refreshing}
+              error={error}
+              lastUpdated={lastUpdated}
+              onRefresh={refresh}
+              priority={priority}
+              onPriority={setPriority}
+              arriveBy={arriveBy}
+              nights={nights}
+              budget={budget}
+              onSelect={(option) => {
+                setSelected(option)
+                go('journey')()
+              }}
+              goHome={go('home')}
+            />
+          )}
+
+          {screen === 'journey' && (
+            <JourneyScreen
+              option={selected}
+              routeLabel={plan?.routeLabel ?? ''}
+              budget={budget}
+              live={live}
+              dest={dest ? { city: dest.city, code: dest.code } : null}
+              goPlanner={go('planner')}
+              goLocked={lockPlan}
+            />
+          )}
+
+          {screen === 'locked' && (
+            <LockedScreen
+              option={selected}
+              budget={budget}
+              leaveBy={live.leaveBy}
+              dest={dest}
+              hasPhrasePack={!!dest && !!PHRASES[dest.lang]}
+              phrasesSaved={learnedCount}
+              phrasesTotal={phrases.length}
+              daysUntil={Math.round(
+                (Date.parse(arriveBy + 'T00:00:00') - new Date().setHours(0, 0, 0, 0)) / 86_400_000,
+              )}
+              goPhrases={go('phrases')}
+              goBriefing={go('briefing')}
+              goHome={go('home')}
+            />
+          )}
+
+          {screen === 'trips' && (
+            <TripsScreen
+              user={account.user}
+              trips={tripsState.trips}
+              loading={tripsState.loading}
+              error={tripsState.error}
+              onReload={tripsState.reload}
+              onDelete={tripsState.remove}
+              goPlanner={go('planner')}
+              goAccount={go('account')}
+            />
+          )}
+
+          {screen === 'profile' && (
+            <ProfileScreen
+              user={account.user}
+              profile={account.profile}
+              loading={account.loading}
+              tripCount={tripsState.trips.length}
+              airports={home.airports}
+              coords={home.coords}
+              onSave={account.savePreferences}
+              onSignOut={account.signOut}
+              onAvatarUploaded={account.refreshProfile}
+              goAccount={go('account')}
+              goPhrases={go('phrases')}
+              goOnboarding={go('onboarding')}
+            />
+          )}
+
+          {screen === 'community' && (
+            <CommunityScreen user={account.user} goAccount={go('account')} />
+          )}
+
+          {screen === 'onboarding' && (
+            <OnboardingScreen priority={priority} onPriority={setPriority} goHome={go('home')} />
+          )}
+
+          {screen === 'phrases' && dest && (
+            <PhrasesScreen
+              destCity={dest.city}
+              phraseKicker={dest.lang + ' · six phrases'}
+              learnedLabel={
+                phrases.length ? learnedCount + ' of ' + phrases.length + ' saved' : 'No phrase pack for this trip'
+              }
+              phraseHint={
+                phrases.length
+                  ? 'Tap a card to check yourself, then save it.'
+                  : dest.city + ' speaks ' + dest.lang + ' — nothing new to learn for this trip.'
+              }
+              progressWidth={(phrases.length ? Math.round((learnedCount / phrases.length) * 100) : 0) + '%'}
+              phrases={phrases}
+              speechLanguage={SPEECH_TAGS[dest.lang]?.split('-')[0]}
+              goHome={go('home')}
+            />
+          )}
+
+          {screen === 'briefing' && dest && (
+            <BriefingScreen
+              dest={dest}
+              signedIn={!!account.user}
+              goHome={go('home')}
+              goPhrases={go('phrases')}
+              goAccount={go('account')}
+            />
+          )}
+
+          {screen === 'account' && (
+            <AuthGate
+              option={selected}
+              destCity={dest?.city ?? 'your destination'}
+              onSignIn={account.signIn}
+              onSignUp={account.signUp}
+              onDone={() => {
+                rememberPreferences()
+                persistTrip()
+                go('locked')()
+              }}
+              onBack={go('journey')}
+              onLegal={(page) => go(page)()}
+            />
+          )}
+
+          {(screen === 'terms' || screen === 'privacy') && (
+            <LegalScreen page={screen} onSwitch={(page) => go(page)()} goHome={go('home')} />
+          )}
+
+          <footer
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 14,
+              padding: '26px 0 6px',
+              fontSize: 12,
+              color: 'var(--color-neutral-600)',
+            }}
+          >
+            <a
+              href="https://www.instagram.com/elijah.rose25"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Meguaz on Instagram — @elijah.rose25"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                color: 'var(--color-neutral-700)',
+                textDecoration: 'none',
+                fontWeight: 700,
+              }}
+            >
+              <Icon name="instagram" size={15} color="var(--color-accent-700)" />
+              @elijah.rose25
+            </a>
+            <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
+            <span>© {new Date().getFullYear()} Meguaz</span>
+            {(
+              [
+                ['terms', 'Terms of Service'],
+                ['privacy', 'Privacy & Cookies'],
+              ] as const
+            ).map(([target, label]) => (
+              <button
+                key={target}
+                onClick={go(target)}
+                style={{
+                  border: 0,
+                  background: 'transparent',
+                  padding: 0,
+                  font: 'inherit',
+                  fontSize: 12,
+                  color: 'var(--color-neutral-700)',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+            </span>
+          </footer>
+        </div>
+
+        {dest && call === 'idle' && (
+          <MusicDock city={dest.city} country={dest.country} raised={isMobile} />
+        )}
+
+        {call !== 'idle' && (
+          <Suspense fallback={null}>
+            <AgentCall call={call} onEnd={endCall} />
+          </Suspense>
+        )}
+
+        <ConsentBanner onPrivacy={go('privacy')} />
+
+        {isMobile && <MobileNav screen={screen} onNavigate={(next) => go(next)()} />}
+      </div>
     </div>
   )
 }

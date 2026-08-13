@@ -34,6 +34,15 @@ export default defineConfig(({ mode }) => {
       port: parseInt(process.env.PORT || '8443'),
       strictPort: true,
       watch: { ignored: ['**/.figma/**'] },
+      // The planner, flight search and ETA endpoints live in the Next app under
+      // web/. Proxying keeps them same-origin for the browser, so no CORS and
+      // no API keys anywhere near the client bundle.
+      proxy: {
+        '/api': {
+          target: process.env.MEGUAZ_API_ORIGIN || 'http://localhost:3000',
+          changeOrigin: true,
+        },
+      },
     },
     preview: {
       host: '0.0.0.0',

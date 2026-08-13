@@ -14,6 +14,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle (.next/standalone) — what the Dockerfile ships
+  // to EC2. `node server.js` runs it with no node_modules install on the box.
+  output: "standalone",
+  // Without this, the repo-root lockfile makes Next treat the repo as a
+  // monorepo and nest the standalone output under web/, breaking the Docker CMD.
+  outputFileTracingRoot: process.cwd(),
   poweredByHeader: false,
   async headers() {
     return [

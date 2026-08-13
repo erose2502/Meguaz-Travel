@@ -2,6 +2,7 @@ import "server-only";
 import { env } from "@/lib/env";
 import { cacheGet, cacheSet, HOURS } from "@/lib/cache";
 import { resolvePlace } from "@/lib/providers/geo";
+import { assertSpendCap } from "@/lib/security/spend-cap";
 
 // Resort/hotel search via SearchApi's google_hotels engine.
 //
@@ -37,6 +38,9 @@ export async function searchHotels(params: HotelSearchParams): Promise<HotelResu
     `hotels:${params.location}:${params.checkIn}:${params.checkOut}:${params.adults}`.toLowerCase();
   const cached = await cacheGet<HotelResult[]>(cacheKey);
   if (cached) return cached;
+
+  // Cache miss means a paid call — check the global ceiling first.
+  await assertSpendCap("searchapi");
 
   // Anchor the query to the real destination. Google Hotels defaults to US
   // geography and returns US properties for a bare "Kyoto"; resolving the place

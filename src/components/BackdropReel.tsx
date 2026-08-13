@@ -1,0 +1,104 @@
+import { useEffect, useRef, useState } from 'react'
+import { HERO_REEL, type HeroSlide } from '../data/media'
+
+type Props = {
+  /** Destination stills; take over the reel once a destination is chosen. */
+  scenes: string[]
+  destCity: string | null
+  /** Generated cinematic clip for the chosen destination, when we have one. */
+  destClip?: string | null
+}
+
+const HOLD_MS = 9000
+
+function prefersReducedMotion() {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
+/**
+ * The app's living background: the cinematic reel fills the whole viewport,
+ * fixed behind every screen. A veil above it (rendered by App) keeps content
+ * legible; this layer only manages the media and its slow crossfade.
+ */
+export default function BackdropReel({ scenes, destCity, destClip = null }: Props) {
+  const sceneSlides: HeroSlide[] = scenes.slice(0, 3).map((src, i) => ({
+    src,
+    alt: ['Arriving in ', 'Streets of ', 'Landmarks of '][i] + (destCity ?? ''),
+  }))
+  const slides: HeroSlide[] = destClip
+    ? [{ src: destClip, alt: 'Cinematic aerial of ' + (destCity ?? 'your destination'), video: true }, ...sceneSlides.slice(0, 2)]
+    : sceneSlides.length > 0
+      ? sceneSlides
+      : HERO_REEL
+
+  const [index, setIndex] = useState(0)
+  const key = slides.map((s) => s.src).join('|')
+
+  useEffect(() => setIndex(0), [key])
+
+  useEffect(() => {
+    if (slides.length < 2 || prefersReducedMotion()) return
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        setIndex((i) => (i + 1) % slides.length)
+      }
+    }, HOLD_MS)
+    return () => clearInterval(id)
+  }, [key, slides.length])
+
+  // Videos are ~5MB each; only the active slide and the one on deck mount.
+  const warmed = useRef(new Set<number>())
+  useEffect(() => {
+    warmed.current.clear()
+  }, [key])
+  const nextIndex = (index + 1) % slides.length
+  const shouldMount = (i: number) => {
+    if (i === index || i === nextIndex || warmed.current.has(i)) {
+      warmed.current.add(i)
+      return true
+    }
+    return false
+  }
+
+  return (
+    <div
+      aria-hidden="true"
+      style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none' }}
+    >
+      {slides.map((slide, i) => (
+        <div
+          key={slide.src}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            opacity: i === index ? 1 : 0,
+            transition: 'opacity 1600ms ease',
+            willChange: 'opacity',
+          }}
+        >
+          {slide.video
+            ? shouldMount(i) && (
+                <video
+                  src={slide.src}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              )
+            : shouldMount(i) && (
+                <img
+                  src={slide.src}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              )}
+        </div>
+      ))}
+    </div>
+  )
+}

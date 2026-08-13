@@ -1,6 +1,7 @@
 import "server-only";
 import { env } from "@/lib/env";
 import { cacheGet, cacheSet, HOURS } from "@/lib/cache";
+import { assertSpendCap } from "@/lib/security/spend-cap";
 
 // Place resolution via Duffel Places. One resolver serves two features:
 //   • flight/ETA path needs the origin/destination airport IATA + coordinates
@@ -26,6 +27,7 @@ export async function resolvePlace(query: string): Promise<ResolvedPlace | null>
   // own (Kyoto, Zanzibar). Duffel Places only knows airports and fuzzy-matches
   // "Kyoto" to "Kotoka" (Accra), so it is used only as a no-token fallback.
   if (process.env.MAPBOX_TOKEN) {
+    await assertSpendCap("maps");
     const m = await mapboxGeocode(q).catch(() => null);
     if (m) {
       await cacheSet(cacheKey, m, 24 * HOURS);
@@ -33,6 +35,7 @@ export async function resolvePlace(query: string): Promise<ResolvedPlace | null>
     }
   }
 
+  await assertSpendCap("duffel");
   const res = await fetch(
     `https://api.duffel.com/places/suggestions?query=${encodeURIComponent(q)}`,
     { headers: { Authorization: `Bearer ${env.duffelApiKey}`, "Duffel-Version": "v2" } }
@@ -110,6 +113,7 @@ export async function airportCoords(
   const cached = await cacheGet<{ lat: number; lng: number }>(cacheKey);
   if (cached) return cached;
 
+  await assertSpendCap("duffel");
   const res = await fetch(
     `https://api.duffel.com/places/suggestions?query=${code}`,
     { headers: { Authorization: `Bearer ${env.duffelApiKey}`, "Duffel-Version": "v2" } }

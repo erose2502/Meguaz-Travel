@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { cacheGet, cacheSet, HOURS } from "@/lib/cache";
+import { assertSpendCap } from "@/lib/security/spend-cap";
 
 // Ground transport intel (train / FlixBus / Amtrak / Greyhound / local operators)
 // via Perplexity sonar. This is the priciest call after plan drafting, so results
@@ -34,6 +35,9 @@ export async function searchGround(params: GroundSearchParams): Promise<GroundOp
   const cacheKey = `ground:${params.origin}:${params.destination}:${monthBucket}`.toLowerCase();
   const cached = await cacheGet<GroundOption[]>(cacheKey);
   if (cached) return cached;
+
+  // Cache miss means a paid call — check the global ceiling first.
+  await assertSpendCap("perplexity");
 
   const res = await fetch("https://api.perplexity.ai/chat/completions", {
     method: "POST",

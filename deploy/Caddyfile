@@ -1,0 +1,49 @@
+# TLS + static front-end + API reverse proxy for the Meguaz app.
+# MEGUAZ_DOMAIN comes from deploy/.env; with "localhost" Caddy serves plain
+# HTTP locally, with a real domain it provisions Let's Encrypt automatically.
+#
+# Cloudflare users: with the DNS record set to "DNS only" (grey cloud) the
+# default Let's Encrypt flow below just works. With the proxy ON (orange
+# cloud), set Cloudflare SSL/TLS to "Full (strict)", create an Origin Server
+# certificate in the Cloudflare dashboard, save it as deploy/certs/origin.pem
+# and deploy/certs/origin.key, and uncomment the `tls` line below.
+
+{$MEGUAZ_DOMAIN:localhost} {
+	encode gzip
+
+	# Cloudflare Origin CA certificate (proxied/orange-cloud mode only):
+	# tls /certs/origin.pem /certs/origin.key
+
+	# Same-origin API keeps keys server-side and needs no CORS.
+	handle /api/* {
+		reverse_proxy web:3000
+	}
+
+	# OAuth landing (Google → Supabase → here) lives on the backend too.
+	handle /auth/* {
+		reverse_proxy web:3000
+	}
+
+	# Vite SPA bundle (npm run build at the repo root → dist/).
+	handle {
+		root * /srv/app
+
+		# Hashed bundle files never change under the same name — cache forever.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+
+		# Generated hero videos/backdrops keep stable names so a regenerated
+		# clip can replace one in place — a week of caching, not immutable.
+		# Behind Cloudflare's proxy these are also cached at the edge, so each
+		# video leaves this box roughly once per week total.
+		@media path /media/*
+		header @media Cache-Control "public, max-age=604800"
+
+		# The HTML shell must always revalidate or deploys don't take effect.
+		@shell path / /index.html
+		header @shell Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
+	}
+}

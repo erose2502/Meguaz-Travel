@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { guard, failure } from "@/lib/security/guard";
+import { guard, failure, capExceeded } from "@/lib/security/guard";
+import { SpendCapError } from "@/lib/security/spend-cap";
+import { captureServerError } from "@/lib/monitoring";
 import { driveEta } from "@/lib/providers/routing";
 import { resolvePlace, airportCoords } from "@/lib/providers/geo";
 
@@ -43,7 +45,8 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json(eta);
   } catch (err) {
-    console.error("eta error", err instanceof Error ? err.message : "unknown");
+    if (err instanceof SpendCapError) return capExceeded();
+    captureServerError("eta", err);
     return failure("Couldn't compute ETA");
   }
 }

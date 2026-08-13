@@ -1,0 +1,40 @@
+# Meguaz app stack for one EC2 box: the Next.js backend (APIs) plus Caddy,
+# which terminates TLS, serves the built Vite front-end from ../dist, and
+# reverse-proxies /api to the backend. See docs/ec2-deploy-web.md.
+#
+# The voice stack (LiveKit + agent) has its own compose file in agent/deploy
+# and can run on the same instance or a separate one.
+
+services:
+  web:
+    build: ../web
+    env_file: .env
+    restart: unless-stopped
+    expose:
+      - "3000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MEGUAZ_DOMAIN: ${MEGUAZ_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro # Cloudflare Origin CA cert lands here (optional)
+      - ../dist:/srv/app:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+
+volumes:
+  caddy-data:
+  caddy-config:

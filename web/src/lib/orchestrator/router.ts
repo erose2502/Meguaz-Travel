@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { env } from "@/lib/env";
 import { toolDefinitions, executeTool } from "@/lib/orchestrator/tools";
 import { recordUsage, overBudget, BUDGET_EXHAUSTED_REPLY } from "@/lib/orchestrator/budget";
+import { assertSpendCap, SpendCapError } from "@/lib/security/spend-cap";
 
 let _openai: OpenAI | null = null;
 function openai() {
@@ -94,6 +95,8 @@ async function complete(
   model: string,
   callerKey: string
 ) {
+  // Global daily ceiling across all callers; throws before any tokens are bought.
+  await assertSpendCap("openai");
   try {
     const res = await openai().chat.completions.create({
       model,
@@ -103,6 +106,9 @@ async function complete(
     await recordUsage(callerKey, res.usage?.total_tokens ?? 0);
     return res;
   } catch (err) {
+    // A cap hit is not a model failure — retrying the fallback would just
+    // spend another counter slot to fail the same way.
+    if (err instanceof SpendCapError) throw err;
     // Single escalation to the fallback (mini-tier) model, then give up loudly.
     if (model !== env.fallbackModel) {
       return complete(msgs, env.fallbackModel, callerKey);

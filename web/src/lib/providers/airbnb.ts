@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { cacheGet, cacheSet, HOURS } from "@/lib/cache";
+import { assertSpendCap } from "@/lib/security/spend-cap";
 
 // Airbnb has no public booking API. We search via SearchApi.io's Airbnb engine and
 // deep-link the user out to complete booking; the trip slot is then confirmed back.
@@ -29,6 +30,9 @@ export async function searchAirbnb(params: AirbnbSearchParams): Promise<AirbnbRe
   const cacheKey = `airbnb:${params.location}:${params.checkIn}:${params.checkOut}:${params.adults}`;
   const cached = await cacheGet<AirbnbResult[]>(cacheKey);
   if (cached) return cached;
+
+  // Cache miss means a paid call — check the global ceiling first.
+  await assertSpendCap("searchapi");
 
   const qs = new URLSearchParams({
     engine: ENGINE,

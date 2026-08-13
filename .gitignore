@@ -11,3 +11,6 @@ logs/
 *.log
 .claude-replay.*
 .tmp-*
+
+# Deploy secrets — Cloudflare origin certs and env live only on the box
+deploy/certs/

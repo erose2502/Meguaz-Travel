@@ -1,15 +1,19 @@
 import { searchFlights, resolveIata, type FlightOffer } from "@/lib/providers/duffel";
+import { nearestAirports } from "@/lib/providers/airports";
 import { airportCoords } from "@/lib/providers/geo";
 import { driveEta } from "@/lib/providers/routing";
+import { searchGround, type GroundOption } from "@/lib/providers/ground";
+import { searchStays, type StaysSearchResult } from "@/lib/providers/stays";
 import type {
   TripBrief,
   PlanOption,
   SolveResponse,
+  StayEstimate,
   TimelineStep,
   CostLine,
 } from "@/lib/plan-types";
 
-// Solves a trip brief into the prototype's three lanes (Frugal / Balanced / Calm)
+// Solves a trip brief into three lanes (Cheapest / Best overall / Most relaxed)
 // from live Duffel offers, wrapped with door-to-door transfer estimates.
 //
 // Transfer legs are static heuristics at MVP (no maps API): rideshare-to-airport
@@ -23,12 +27,16 @@ const TRANSFER = {
   borderMin: 45,
   intoCityMin: 35,
   intoCityCost: 35,
+  // Airport-transfer preference models (transparent estimates, labelled so).
+  parkingPerDay: 18, // economy-lot per day
+  transitCost: 14, // flat airport-transit estimate
+  transitFactor: 1.55, // transit typically slower than the drive
 };
 
 const LANES = {
-  frugal: { buffer: 2, bufferMin: 25, label: "Tight" },
-  balanced: { buffer: 4, bufferMin: 70, label: "Comfortable" },
-  calm: { buffer: 5, bufferMin: 90, label: "Generous" },
+  frugal: { buffer: 2, bufferMin: 25, label: "Tight connection" },
+  balanced: { buffer: 4, bufferMin: 70, label: "Comfortable gap" },
+  calm: { buffer: 5, bufferMin: 90, label: "Plenty of slack" },
 } as const;
 
 export async function solveTrip(brief: TripBrief): Promise<SolveResponse | null> {
@@ -46,7 +54,18 @@ export async function solveTrip(brief: TripBrief): Promise<SolveResponse | null>
     const dest = await airportCoords(origin).catch(() => null);
     if (dest) {
       const eta = await driveEta(brief.originCoords, dest).catch(() => null);
-      if (eta) {
+      // Nobody takes a rideshare to an airport on another continent. If the
+      // coordinates and the departure airport disagree this badly, the
+      // coordinates are not describing this trip — ignore them rather than
+      // billing a 42-hour, $6,000 taxi. (Real case: a traveller in
+      // Pennsylvania with a plan departing SFO.)
+      const PLAUSIBLE_TRANSFER_MIN = 240;
+      const PLAUSIBLE_TRANSFER_KM = 300;
+      if (
+        eta &&
+        eta.minutes <= PLAUSIBLE_TRANSFER_MIN &&
+        eta.distanceKm <= PLAUSIBLE_TRANSFER_KM
+      ) {
         // Rough fare model until a rideshare API is wired: base + per-km.
         drive = {
           minutes: eta.minutes,
@@ -57,14 +76,40 @@ export async function solveTrip(brief: TripBrief): Promise<SolveResponse | null>
     }
   }
 
+  // The leg from the arrival airport into the city. searchGround knows about
+  // FlixBus, national rail and local operators and caches per route+month.
+  // This first lookup (for the city's main airport) drives the deadline filter;
+  // once the three lanes are chosen, any lane landing at a DIFFERENT airport
+  // gets its own lookup — an offer into Stockholm Västerås must not be paired
+  // with the Arlanda Express.
+  const ground = await groundFor(destination, brief.to, brief.arriveBy);
+
   // "Arrive by" is a deadline, not a departure date. A long-haul leg departing
   // ON the deadline usually lands the next morning — past it. So we look at
   // departures the day before as well, then keep only itineraries that actually
   // touch down (plus inbound transfer time) before the deadline expires.
+  //
+  // A trip length in the brief turns each search into a round trip: Duffel
+  // prices both slices in the same offer request (no extra call), and the plan's
+  // total becomes the whole trip instead of a one-way surprise.
+  const returnDate = brief.nights ? shiftDate(brief.arriveBy, brief.nights) : undefined;
   const dayBefore = shiftDate(brief.arriveBy, -1);
-  const [sameDay, priorDay] = await Promise.all([
-    searchFlights({ origin, destination, departureDate: brief.arriveBy, adults: brief.adults }),
-    searchFlights({ origin, destination, departureDate: dayBefore, adults: brief.adults }),
+  // A trip length also makes a stay estimate possible: one cached listings
+  // search for the same window, folded into "total trip cost in view". Fetched
+  // in parallel with the flights and never allowed to fail the solve.
+  const staysPromise: Promise<StaysSearchResult | null> = returnDate
+    ? searchStays({
+        preference: "home",
+        location: title(brief.to),
+        checkIn: brief.arriveBy,
+        checkOut: returnDate,
+        adults: brief.adults,
+      }).catch(() => null)
+    : Promise.resolve(null);
+  const [sameDay, priorDay, stays] = await Promise.all([
+    searchFlights({ origin, destination, departureDate: brief.arriveBy, returnDate, adults: brief.adults, cabinClass: brief.cabinClass }),
+    searchFlights({ origin, destination, departureDate: dayBefore, returnDate, adults: brief.adults, cabinClass: brief.cabinClass }),
+    staysPromise,
   ]);
 
   const all = dedupeById([...sameDay, ...priorDay]).filter(
@@ -76,7 +121,7 @@ export async function solveTrip(brief: TripBrief): Promise<SolveResponse | null>
   const onTime = all.filter((o) => {
     const landed = new Date(o.slices[0].arrivingAt);
     const atDoor = new Date(
-      landed.getTime() + (TRANSFER.borderMin + TRANSFER.intoCityMin) * 60_000
+      landed.getTime() + (TRANSFER.borderMin + ground.minutes) * 60_000
     );
     return atDoor <= deadline;
   });
@@ -106,20 +151,102 @@ export async function solveTrip(brief: TripBrief): Promise<SolveResponse | null>
   const balanced = claim(byBalance);
 
   const options: PlanOption[] = [
-    buildOption("frugal", "The Frugal Route", "Lowest total cost", cheapest, brief, "money", drive),
-    buildOption("balanced", "The Balanced Route", "Best mix of price and calm", balanced, brief, "balanced", drive),
-    buildOption("calm", "The Calm Route", "Most breathing room", calmest, brief, "time", drive),
+    buildOption("frugal", "Cheapest overall", "Lowest total price, tighter connections", cheapest, brief, "money", drive, ground),
+    buildOption("balanced", "Best overall", "Good price with time to spare", balanced, brief, "balanced", drive, ground),
+    buildOption("calm", "Most relaxed", "Latest start and the widest safety margin", calmest, brief, "time", drive, ground),
   ];
+
+  // A 3-hour, $300 rideshare to the airport deserves a comment, not silence.
+  // When the priced ride is extreme and a materially closer airport exists,
+  // say so — the traveller may simply not know which hub they live near.
+  let originAdvice: string | null = null;
+  if (drive && brief.originCoords && drive.minutes >= 90) {
+    const nearest = nearestAirports(brief.originCoords, 1)[0];
+    if (nearest && nearest.iata !== origin) {
+      const hours = Math.round((drive.minutes / 60) * 10) / 10;
+      originAdvice =
+        `The ride to ${origin} runs ~${hours}h and ~$${drive.cost}. ` +
+        `${nearest.name} (${nearest.iata}) is only ${nearest.distanceKm} km from you — ` +
+        `switching your departure airport could save serious money and time.`;
+    }
+  }
 
   return {
     brief,
     routeLabel: `${title(brief.from)} → ${title(brief.to)}`,
     meetsDeadline,
+    returnDate: returnDate ?? null,
+    stay: stayEstimate(stays, brief.nights ?? 0),
+    originAdvice,
     options,
   };
 }
 
-function dedupeById(offers: FlightOffer[]): FlightOffer[] {
+/** Median nightly price across live listings — resistant to one luxury outlier. */
+export function stayEstimate(
+  stays: StaysSearchResult | null,
+  nights: number
+): StayEstimate | null {
+  if (!stays || nights <= 0) return null;
+  const nightly = stays.results
+    .map((r) => {
+      if ("pricePerNight" in r && r.pricePerNight != null) return r.pricePerNight;
+      if ("totalAmount" in r && r.totalAmount != null) return Number(r.totalAmount) / nights;
+      return null;
+    })
+    .filter((n): n is number => typeof n === "number" && Number.isFinite(n) && n > 0)
+    .sort((a, b) => a - b);
+  if (nightly.length === 0) return null;
+  const median = nightly[Math.floor(nightly.length / 2)];
+  return {
+    nightlyUsd: Math.round(median),
+    nights,
+    totalUsd: Math.round(median * nights),
+    kind: stays.kind,
+  };
+}
+
+export type GroundBundle = {
+  leg: GroundOption | null;
+  alts: GroundOption[];
+  minutes: number;
+  cost: number;
+};
+
+/**
+ * Best airport→city transfer for one SPECIFIC arrival airport, with live
+ * alternatives. Cached per route+month upstream; falls back to flat metro
+ * estimates rather than failing the solve.
+ */
+async function groundFor(airportIata: string, city: string, date: string): Promise<GroundBundle> {
+  let leg: GroundOption | null = null;
+  let alts: GroundOption[] = [];
+  try {
+    const options = await searchGround({
+      origin: `${airportIata} airport`,
+      destination: `${title(city)} city centre`,
+      date,
+    });
+    // Prefer the quickest option that carries real numbers we can add up.
+    const priced = options
+      .filter((o) => o.typicalDurationHours != null && o.typicalPriceUsd.min != null)
+      .sort((a, b) => (a.typicalDurationHours ?? 99) - (b.typicalDurationHours ?? 99));
+    leg = priced[0] ?? options[0] ?? null;
+    alts = (priced.length ? priced : options).filter((o) => o !== leg).slice(0, 3);
+  } catch {
+    // Flat estimate below rather than a failed solve.
+  }
+  return {
+    leg,
+    alts,
+    minutes: leg?.typicalDurationHours
+      ? Math.round(leg.typicalDurationHours * 60)
+      : TRANSFER.intoCityMin,
+    cost: leg?.typicalPriceUsd.min != null ? Math.round(leg.typicalPriceUsd.min) : TRANSFER.intoCityCost,
+  };
+}
+
+export function dedupeById(offers: FlightOffer[]): FlightOffer[] {
   const seen = new Map<string, FlightOffer>();
   for (const o of offers) if (!seen.has(o.id)) seen.set(o.id, o);
   return [...seen.values()];
@@ -127,14 +254,14 @@ function dedupeById(offers: FlightOffer[]): FlightOffer[] {
 
 // Lower is calmer: nonstop first, then shorter air time, then a later departure
 // (a 9am start beats a 5am one for the same itinerary).
-function calmScore(o: FlightOffer): number {
+export function calmScore(o: FlightOffer): number {
   const s = o.slices[0];
   const departHour = new Date(s.departingAt).getHours();
   const earlyPenalty = departHour < 8 ? (8 - departHour) * 20 : 0;
   return s.segments * 600 + (s.durationMinutes ?? 9999) + earlyPenalty;
 }
 
-function shiftDate(iso: string, days: number): string {
+export function shiftDate(iso: string, days: number): string {
   const d = new Date(`${iso}T12:00:00`);
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
@@ -144,23 +271,74 @@ function rank(o: FlightOffer, list: FlightOffer[]) {
   return list.findIndex((x) => x.id === o.id);
 }
 
-function buildOption(
+export function buildOption(
   id: keyof typeof LANES,
   name: string,
   tagline: string,
   offer: FlightOffer,
   brief: TripBrief,
   fits: PlanOption["fits"],
-  drive: { minutes: number; cost: number; trafficAware: boolean } | null
+  drive: { minutes: number; cost: number; trafficAware: boolean } | null,
+  ground: { leg: GroundOption | null; alts: GroundOption[]; minutes: number; cost: number }
 ): PlanOption {
   const lane = LANES[id];
   const slice = offer.slices[0];
+  // With a return slice priced, totalAmount already covers the whole trip.
+  const roundTrip = offer.slices.length > 1;
   const flightCost = Math.round(Number(offer.totalAmount));
 
-  // Real drive time/fare from the user's location when available, else static.
-  const toAirportMin = drive?.minutes ?? TRANSFER.toAirportMin;
-  const toAirportCost = drive?.cost ?? TRANSFER.toAirportCost;
-  const total = flightCost + toAirportCost + TRANSFER.intoCityCost;
+  // The traveller's airport-transfer preference decides both the clock and the
+  // money — a $130 rideshare, a parked car, a free kerbside drop-off and a
+  // transit ride are wildly different totals for the same flight.
+  const mode = brief.airportTransfer ?? "rideshare";
+  const baseDriveMin = drive?.minutes ?? TRANSFER.toAirportMin;
+  const toAirportMin =
+    mode === "transit" ? Math.round(baseDriveMin * TRANSFER.transitFactor) : baseDriveMin;
+  const parkingDays = (brief.nights ?? 1) + 1;
+  const toAirportCost =
+    mode === "rideshare"
+      ? (drive?.cost ?? TRANSFER.toAirportCost)
+      : mode === "drive"
+        ? Math.max(TRANSFER.parkingPerDay, TRANSFER.parkingPerDay * parkingDays)
+        : mode === "dropoff"
+          ? 0
+          : TRANSFER.transitCost;
+  const total = flightCost + toAirportCost + ground.cost;
+
+  const TRANSFER_COPY: Record<
+    typeof mode,
+    { homeDetail: string; legLabel: string; stepDetail: string; costLabel: string; legType: "car" | "train" }
+  > = {
+    rideshare: {
+      homeDetail: "Rideshare ordered for your departure window",
+      legLabel: `Rideshare to ${slice.origin}`,
+      stepDetail: "Fare estimate locked",
+      costLabel: "Rideshare to airport",
+      legType: "car",
+    },
+    drive: {
+      homeDetail: "Driving yourself — parking estimated below",
+      legLabel: `Drive to ${slice.origin}`,
+      stepDetail: `Economy lot · ~$${TRANSFER.parkingPerDay}/day × ${parkingDays} days (est.)`,
+      costLabel: `Airport parking · ${parkingDays} days (est.)`,
+      legType: "car",
+    },
+    dropoff: {
+      homeDetail: "Getting dropped off at departures",
+      legLabel: `Ride to ${slice.origin} · drop-off`,
+      stepDetail: "No transfer cost — thank your driver",
+      costLabel: "Airport drop-off",
+      legType: "car",
+    },
+    transit: {
+      homeDetail: "Heading to the airport by transit",
+      legLabel: `Transit to ${slice.origin}`,
+      stepDetail: "Ticket estimate — check local schedules",
+      costLabel: "Transit to airport (est.)",
+      legType: "train",
+    },
+  };
+  const transfer = TRANSFER_COPY[mode];
 
   const depart = new Date(slice.departingAt);
   const arrive = new Date(slice.arrivingAt);
@@ -168,7 +346,7 @@ function buildOption(
     toAirportMin + TRANSFER.checkinMin + TRANSFER.securityWaitMin + lane.bufferMin;
   const leaveHome = new Date(depart.getTime() - preFlightMin * 60_000);
   const doorClose = new Date(
-    arrive.getTime() + (TRANSFER.borderMin + TRANSFER.intoCityMin) * 60_000
+    arrive.getTime() + (TRANSFER.borderMin + ground.minutes) * 60_000
   );
   const doorToDoorMin = Math.round((doorClose.getTime() - leaveHome.getTime()) / 60_000);
 
@@ -185,13 +363,14 @@ function buildOption(
     {
       id: "home", icon: "home", time: hm(leaveHome), label: "Leave home",
       location: drive ? "Your current location" : `${title(brief.from)} home base`,
-      detail: "Rideshare ordered for your departure window", cost: `$${toAirportCost}`, kind: "go", note: null,
+      detail: transfer.homeDetail, cost: toAirportCost > 0 ? `$${toAirportCost}` : null, kind: "go", note: null,
     },
     {
-      id: "drive", icon: "car", time: `${hm(leaveHome)} → ${hm(addMin(leaveHome, toAirportMin))}`,
-      label: `Rideshare to ${slice.origin}`,
+      id: "drive", icon: mode === "transit" ? "train" : "car",
+      time: `${hm(leaveHome)} → ${hm(addMin(leaveHome, toAirportMin))}`,
+      label: transfer.legLabel,
       location: `~${toAirportMin} min · ${driveDetail}`,
-      detail: "Fare estimate locked", cost: null, kind: "normal", note: null,
+      detail: transfer.stepDetail, cost: null, kind: "normal", note: null,
     },
     {
       id: "checkin", icon: "checkin", time: `${hm(addMin(leaveHome, toAirportMin))} → ${hm(addMin(leaveHome, toAirportMin + TRANSFER.checkinMin))}`,
@@ -209,7 +388,8 @@ function buildOption(
       id: "flight", icon: "flight", time: `${hm(depart)} → ${hm(arrive)}`,
       label: `${slice.origin} → ${slice.destination} · ${flightLabel}`,
       location: `${offer.owner} · ${dur(slice.durationMinutes)} in the air`,
-      detail: "Flight fare", cost: `$${flightCost}`, kind: "main", note: null,
+      detail: roundTrip ? "Round-trip fare — return leg included" : "Flight fare",
+      cost: `$${flightCost}`, kind: "main", note: null,
     },
     {
       id: "arrive", icon: "door", time: hm(arrive), label: `Arrive ${title(brief.to)}`,
@@ -217,17 +397,40 @@ function buildOption(
       detail: `We padded ${TRANSFER.borderMin} min for arrivals`, cost: null, kind: "normal", note: null,
     },
     {
-      id: "rail", icon: "train", time: `${hm(addMin(arrive, TRANSFER.borderMin))} → ${hm(doorClose)}`,
-      label: "Train into the city",
-      location: `~${TRANSFER.intoCityMin} min incl. walk`,
-      detail: "Ticket fare", cost: `$${TRANSFER.intoCityCost}`, kind: "go", note: null,
+      id: "rail",
+      icon: "train",
+      time: `${hm(addMin(arrive, TRANSFER.borderMin))} → ${hm(doorClose)}`,
+      label: ground.leg
+        ? `${title(ground.leg.mode)} into the city · ${ground.leg.operator}`
+        : "Transport into the city",
+      location: `~${ground.minutes} min incl. walk`,
+      detail: ground.leg?.frequency ? `Ticket fare · ${ground.leg.frequency}` : "Ticket fare, estimated",
+      cost: `$${ground.cost}`,
+      kind: "go",
+      note:
+        ground.alts.length > 0
+          ? "Also from the airport: " +
+            ground.alts
+              .map(
+                (a) =>
+                  `${a.operator}${a.typicalDurationHours ? ` ~${Math.round(a.typicalDurationHours * 60)}m` : ""}` +
+                  `${a.typicalPriceUsd.min != null ? ` from $${Math.round(a.typicalPriceUsd.min)}` : ""}`
+              )
+              .join(" · ")
+          : (ground.leg?.notes ?? null),
     },
   ];
 
   const costBreakdown: CostLine[] = [
-    { label: `Flight (${flightLabel.toLowerCase()})`, amount: flightCost, color: "#146C7E" },
-    { label: "Rideshare to airport", amount: toAirportCost, color: "#FF7A00" },
-    { label: "Train into city", amount: TRANSFER.intoCityCost, color: "#2FB4B4" },
+    {
+      label: roundTrip
+        ? `Round-trip flight (${flightLabel.toLowerCase()} out)`
+        : `Flight (${flightLabel.toLowerCase()})`,
+      amount: flightCost,
+      color: "#146C7E",
+    },
+    { label: transfer.costLabel, amount: toAirportCost, color: "#FF7A00" },
+    { label: ground.leg ? `${title(ground.leg.mode)} into city` : "Transport into city", amount: ground.cost, color: "#2FB4B4" },
   ];
 
   return {
@@ -243,12 +446,12 @@ function buildOption(
     tradeoff:
       under >= 0
         ? `$${under} under budget with a ${lane.bufferMin}-minute cushion at the airport.`
-        : `$${Math.abs(under)} over your cap — consider the Frugal lane or a later date.`,
+        : `$${Math.abs(under)} over your cap — try the cheapest option or a later date.`,
     legs: [
       { type: "home", label: "Home", time: "" },
-      { type: "car", label: "Rideshare", time: `${toAirportMin}m` },
+      { type: transfer.legType, label: transfer.legLabel, time: `${toAirportMin}m` },
       { type: "flight", label: flightLabel, time: dur(slice.durationMinutes) },
-      { type: "train", label: "Rail", time: `${TRANSFER.intoCityMin}m` },
+      { type: "train", label: ground.leg ? title(ground.leg.mode) : "Rail", time: `${ground.minutes}m` },
     ],
     fits,
     steps,

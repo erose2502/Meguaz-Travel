@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { solveTrip } from "@/lib/plan-solver";
-import { guard, failure } from "@/lib/security/guard";
+import { guard, failure, capExceeded } from "@/lib/security/guard";
+import { SpendCapError } from "@/lib/security/spend-cap";
+import { captureServerError } from "@/lib/monitoring";
 
 const schema = z.object({
   from: z.string().min(2).max(120),
@@ -9,6 +11,9 @@ const schema = z.object({
   arriveBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   budget: z.number().min(50).max(100000),
   adults: z.number().int().min(1).max(9).default(1),
+  nights: z.number().int().min(1).max(90).optional(),
+  airportTransfer: z.enum(["rideshare", "drive", "dropoff", "transit"]).optional(),
+  cabinClass: z.enum(["economy", "premium_economy", "business", "first"]).optional(),
   originCoords: z
     .object({
       lat: z.number().min(-90).max(90),
@@ -39,7 +44,8 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(solved);
   } catch (err) {
-    console.error("plan solve error", err instanceof Error ? err.message : "unknown");
+    if (err instanceof SpendCapError) return capExceeded();
+    captureServerError("plan-solve", err);
     return failure("Solver temporarily unavailable");
   }
 }
