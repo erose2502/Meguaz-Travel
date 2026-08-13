@@ -76,6 +76,98 @@ export async function searchFlights(params: FlightSearchParams): Promise<FlightO
   }));
 }
 
+// ── Booking ──────────────────────────────────────────────────────────────────
+
+export type OfferDetails = {
+  id: string;
+  totalAmount: string;
+  totalCurrency: string;
+  expiresAt: string | null;
+  passengerIds: string[];
+};
+
+/** Re-fetch an offer before booking: price, expiry and passenger ids. */
+export async function getOffer(offerId: string): Promise<OfferDetails | null> {
+  await assertSpendCap("duffel");
+  const res = await fetch(`https://api.duffel.com/air/offers/${encodeURIComponent(offerId)}`, {
+    headers: { Authorization: `Bearer ${env.duffelApiKey}`, "Duffel-Version": "v2" },
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  const d = json?.data;
+  if (!d?.id) return null;
+  return {
+    id: d.id,
+    totalAmount: d.total_amount,
+    totalCurrency: d.total_currency,
+    expiresAt: d.expires_at ?? null,
+    passengerIds: (d.passengers ?? []).map((p: { id: string }) => p.id),
+  };
+}
+
+export type OrderPassenger = {
+  id: string; // passenger id from the offer
+  given_name: string;
+  family_name: string;
+  born_on: string; // YYYY-MM-DD
+  gender: "m" | "f";
+  title: "mr" | "ms" | "mrs" | "miss";
+  email: string;
+  phone_number: string; // E.164
+};
+
+export type OrderResult = {
+  orderId: string;
+  bookingReference: string | null;
+  liveMode: boolean;
+  totalAmount: string;
+  totalCurrency: string;
+};
+
+/**
+ * Creates the Duffel order — the actual ticket purchase. Payment uses the
+ * Duffel balance: in test mode that books instantly with no real money; in
+ * live mode it requires a funded balance, so failures surface clearly.
+ */
+export async function createOrder(
+  offer: OfferDetails,
+  passengers: OrderPassenger[]
+): Promise<OrderResult> {
+  await assertSpendCap("duffel");
+  const res = await fetch("https://api.duffel.com/air/orders", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.duffelApiKey}`,
+      "Duffel-Version": "v2",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      data: {
+        type: "instant",
+        selected_offers: [offer.id],
+        passengers,
+        payments: [
+          { type: "balance", amount: offer.totalAmount, currency: offer.totalCurrency },
+        ],
+      },
+    }),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const code = json?.errors?.[0]?.code ?? `http_${res.status}`;
+    // Status/code only — Duffel error bodies can echo request details.
+    throw new Error(`duffel_order_failed:${code}`);
+  }
+  const d = json?.data;
+  return {
+    orderId: d?.id ?? "",
+    bookingReference: d?.booking_reference ?? null,
+    liveMode: Boolean(d?.live_mode),
+    totalAmount: d?.total_amount ?? offer.totalAmount,
+    totalCurrency: d?.total_currency ?? offer.totalCurrency,
+  };
+}
+
 // Resolve a free-text city to its main airport IATA code via Duffel Places.
 export async function resolveIata(query: string): Promise<string | null> {
   if (/^[A-Za-z]{3}$/.test(query.trim())) return query.trim().toUpperCase();

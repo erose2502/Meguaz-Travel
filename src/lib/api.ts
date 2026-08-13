@@ -355,6 +355,34 @@ export async function deleteReview(id: string) {
   return (await res.json()) as { ok: true }
 }
 
+// ── Booking ─────────────────────────────────────────────────────────────────
+
+export type BookingPassenger = {
+  firstName: string
+  lastName: string
+  dob: string
+  gender: 'm' | 'f'
+  title: 'mr' | 'ms' | 'mrs' | 'miss'
+}
+
+export type BookingResult = {
+  orderId: string
+  bookingReference: string | null
+  liveMode: boolean
+  total: number
+  currency: string
+}
+
+export function bookFlight(params: {
+  offerId: string
+  email: string
+  phone: string
+  passengers: BookingPassenger[]
+  approvedAmount: number
+}) {
+  return post<BookingResult>('/api/book', params)
+}
+
 // ── Saved trips ─────────────────────────────────────────────────────────────
 
 export type Trip = {

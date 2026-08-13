@@ -19,6 +19,7 @@ import OnboardingScreen from './components/OnboardingScreen'
 import PhrasesScreen, { type PhraseCard } from './components/PhrasesScreen'
 import BriefingScreen from './components/BriefingScreen'
 import AuthGate from './components/AuthGate'
+import BookingSheet from './components/BookingSheet'
 import LegalScreen from './components/LegalScreen'
 import ConsentBanner from './components/ConsentBanner'
 import MusicDock from './components/MusicDock'
@@ -27,7 +28,14 @@ import { DEST_HERO_CLIPS } from './data/media'
 import { PHRASES, SPEECH_TAGS } from './data/phrases'
 import { sceneUrls } from './data/scenes'
 import { searchDestinations } from './lib/search'
-import { createTrip, type CabinClass, type PlanOption, type TransferMode, type TripBrief } from './lib/api'
+import {
+  createTrip,
+  type BookingResult,
+  type CabinClass,
+  type PlanOption,
+  type TransferMode,
+  type TripBrief,
+} from './lib/api'
 import { useLiveLeaveBy, useTripPlan } from './lib/useTripPlan'
 import { useHomeCity } from './lib/useHomeCity'
 import { useAccount } from './lib/useAccount'
@@ -124,6 +132,8 @@ export default function App({
   const [adults, setAdults] = useState(SHARED?.adults ?? 1)
   const [planActive, setPlanActive] = useState(!!SHARED)
   const [selected, setSelected] = useState<PlanOption | null>(null)
+  const [bookingOpen, setBookingOpen] = useState(false)
+  const [booking, setBooking] = useState<BookingResult | null>(null)
 
   const [companions, setCompanions] = useState<string[]>([])
   const [cabinClass, setCabinClass] = useState<CabinClass>('economy')
@@ -258,7 +268,7 @@ export default function App({
     time: 'comfort',
   }
 
-  const persistTrip = () => {
+  const persistTrip = (booked?: BookingResult | null) => {
     if (!account.user || !selected || !dest) return
     createTrip({
       title: departure + ' → ' + dest.city,
@@ -267,7 +277,7 @@ export default function App({
       arriveBy,
       adults,
       budgetUsd: budget,
-      estimatedTotalUsd: selected.cost,
+      estimatedTotalUsd: booked?.total ?? selected.cost,
       costLane: LANE[selected.fits] ?? 'balanced',
       brief: {
         cabinClass,
@@ -278,6 +288,13 @@ export default function App({
         offerId: selected.offerId,
         route: selected.name,
         destinationCode: dest.code,
+        ...(booked
+          ? {
+              orderId: booked.orderId,
+              bookingReference: booked.bookingReference,
+              liveMode: booked.liveMode,
+            }
+          : {}),
       },
     })
       .then(() => tripsState.reload())
@@ -286,14 +303,31 @@ export default function App({
       })
   }
 
+  // Lock = book. Signed-in travellers get the passenger sheet; everyone else
+  // signs in first and lands back here.
   const lockPlan = () => {
     if (account.user) {
-      rememberPreferences()
-      persistTrip()
-      go('locked')()
+      setBooking(null)
+      setBookingOpen(true)
     } else {
       go('account')()
     }
+  }
+
+  const finishBooked = (result: BookingResult) => {
+    setBooking(result)
+    setBookingOpen(false)
+    rememberPreferences()
+    persistTrip(result)
+    go('locked')()
+  }
+
+  const finishSkipped = () => {
+    setBooking(null)
+    setBookingOpen(false)
+    rememberPreferences()
+    persistTrip(null)
+    go('locked')()
   }
 
   // A fresh solve invalidates the previously selected option.
@@ -517,6 +551,7 @@ export default function App({
               arriveBy={arriveBy}
               nights={nights}
               userEmail={account.user?.email ?? null}
+              booking={booking}
               hasPhrasePack={!!dest && !!PHRASES[dest.lang]}
               phrasesSaved={learnedCount}
               phrasesTotal={phrases.length}
@@ -603,9 +638,11 @@ export default function App({
               onSignIn={account.signIn}
               onSignUp={account.signUp}
               onDone={() => {
-                rememberPreferences()
-                persistTrip()
-                go('locked')()
+                // Signed in mid-lock: return to the plan and open the booking
+                // sheet so the purchase continues where it left off.
+                go('journey')()
+                setBooking(null)
+                setBookingOpen(true)
               }}
               onBack={go('journey')}
               onLegal={(page) => go(page)()}
@@ -673,6 +710,18 @@ export default function App({
             </span>
           </footer>
         </div>
+
+        {bookingOpen && selected && dest && (
+          <BookingSheet
+            option={selected}
+            destCity={dest.city}
+            adults={adults}
+            email={account.user?.email ?? ''}
+            onClose={() => setBookingOpen(false)}
+            onBooked={finishBooked}
+            onSkip={finishSkipped}
+          />
+        )}
 
         {dest && call === 'idle' && (
           <MusicDock city={dest.city} country={dest.country} raised={isMobile} />

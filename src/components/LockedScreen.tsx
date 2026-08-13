@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Icon from './Icon'
 import TripPrep from './TripPrep'
-import type { PlanOption } from '../lib/api'
+import type { BookingResult, PlanOption } from '../lib/api'
 import type { Destination } from '../data/destinations'
 
 type Props = {
@@ -12,6 +12,7 @@ type Props = {
   arriveBy: string
   nights: number
   userEmail: string | null
+  booking: BookingResult | null
   hasPhrasePack: boolean
   phrasesSaved: number
   phrasesTotal: number
@@ -65,6 +66,7 @@ export default function LockedScreen({
   arriveBy,
   nights,
   userEmail,
+  booking,
   hasPhrasePack,
   phrasesSaved,
   phrasesTotal,
@@ -135,16 +137,30 @@ export default function LockedScreen({
           margin: '16px 0 6px',
         }}
       >
-        Plan locked
+        {booking ? 'Flight booked' : 'Plan locked'}
       </p>
       <h1 style={{ fontSize: 'clamp(26px,3.6vw,42px)', lineHeight: 1.05, margin: '0 0 8px' }}>
-        Your journey is handled.
+        {booking ? 'You’re on the flight.' : 'Your journey is handled.'}
       </h1>
+      {booking && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, margin: '0 0 8px' }}>
+          <span className="tag tag-accent-2" style={{ fontSize: 13, padding: '5px 14px', fontWeight: 700 }}>
+            Reference · {booking.bookingReference ?? booking.orderId.slice(0, 10)}
+          </span>
+          {!booking.liveMode && (
+            <span className="tag tag-accent" title="Booked against the test environment — no real ticket was issued">
+              Test booking — no real ticket
+            </span>
+          )}
+        </div>
+      )}
       <p style={{ fontSize: 14, color: 'var(--color-neutral-700)', margin: 0 }}>
         {option
-          ? userEmail
-            ? 'Every leg timed against live fares — saved to your trips (' + userEmail + '). Complete the booking with the airline before fares move.'
-            : 'Every leg timed against live fares. Sign in to keep this plan in your trips.'
+          ? booking
+            ? '$' + booking.total + ' ' + booking.currency + ' confirmed with the airline' + (userEmail ? ' — details in your trips (' + userEmail + ').' : '.')
+            : userEmail
+              ? 'Every leg timed against live fares — saved to your trips (' + userEmail + '). Complete the booking with the airline before fares move.'
+              : 'Every leg timed against live fares. Sign in to keep this plan in your trips.'
           : 'Pick a route first and the locked plan appears here.'}
       </p>
 
