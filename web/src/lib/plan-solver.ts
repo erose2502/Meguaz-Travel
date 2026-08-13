@@ -150,10 +150,22 @@ export async function solveTrip(brief: TripBrief): Promise<SolveResponse | null>
   const calmest = claim(byCalm);
   const balanced = claim(byBalance);
 
+  // Transfers must match where each lane actually lands — an offer into
+  // Stockholm Västerås must not be paired with the Arlanda Express. Extra
+  // lookups are cached per route+month, and there are at most two.
+  const groundByArrival = new Map<string, GroundBundle>([[destination, ground]]);
+  for (const offer of [cheapest, balanced, calmest]) {
+    const arrival = offer.slices[0]?.destination;
+    if (arrival && !groundByArrival.has(arrival)) {
+      groundByArrival.set(arrival, await groundFor(arrival, brief.to, brief.arriveBy));
+    }
+  }
+  const groundOf = (o: FlightOffer) => groundByArrival.get(o.slices[0]?.destination ?? "") ?? ground;
+
   const options: PlanOption[] = [
-    buildOption("frugal", "Cheapest overall", "Lowest total price, tighter connections", cheapest, brief, "money", drive, ground),
-    buildOption("balanced", "Best overall", "Good price with time to spare", balanced, brief, "balanced", drive, ground),
-    buildOption("calm", "Most relaxed", "Latest start and the widest safety margin", calmest, brief, "time", drive, ground),
+    buildOption("frugal", "The Smart Saver", "Lowest total price, tighter connections", cheapest, brief, "money", drive, groundOf(cheapest)),
+    buildOption("balanced", "The Sweet Spot", "Great price with time to spare", balanced, brief, "balanced", drive, groundOf(balanced)),
+    buildOption("calm", "The Smooth Ride", "Latest start and the widest safety margin", calmest, brief, "time", drive, groundOf(calmest)),
   ];
 
   // A 3-hour, $300 rideshare to the airport deserves a comment, not silence.

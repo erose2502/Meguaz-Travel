@@ -49,14 +49,21 @@ export default function BackdropReel({ scenes, destCity, destClip = null }: Prop
     return () => clearInterval(id)
   }, [key, slides.length])
 
-  // Videos are ~5MB each; only the active slide and the one on deck mount.
+  // Videos are ~5MB each. First paint only streams the ACTIVE slide; the one
+  // on deck starts preloading a few seconds later, once the page has settled —
+  // otherwise two videos race the bundle and fonts down one connection.
   const warmed = useRef(new Set<number>())
+  const [settled, setSettled] = useState(false)
   useEffect(() => {
     warmed.current.clear()
   }, [key])
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(true), 6000)
+    return () => clearTimeout(t)
+  }, [])
   const nextIndex = (index + 1) % slides.length
   const shouldMount = (i: number) => {
-    if (i === index || i === nextIndex || warmed.current.has(i)) {
+    if (i === index || (settled && i === nextIndex) || warmed.current.has(i)) {
       warmed.current.add(i)
       return true
     }
@@ -68,6 +75,13 @@ export default function BackdropReel({ scenes, destCity, destClip = null }: Prop
       aria-hidden="true"
       style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none' }}
     >
+      {/* Instant ground: a ~300KB still paints immediately, so the page never
+          shows a void while the first video streams in over it. */}
+      <img
+        src="/media/plan-fjords.jpg"
+        alt=""
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+      />
       {slides.map((slide, i) => (
         <div
           key={slide.src}

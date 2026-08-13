@@ -8,6 +8,11 @@
 # certificate in the Cloudflare dashboard, save it as deploy/certs/origin.pem
 # and deploy/certs/origin.key, and uncomment the `tls` line below.
 
+# Bare domain → www, so typing meguaz.com never dead-ends.
+meguaz.com {
+	redir https://www.meguaz.com{uri} permanent
+}
+
 {$MEGUAZ_DOMAIN:localhost} {
 	encode gzip
 
