@@ -79,27 +79,50 @@ function isoInDays(days: number) {
   return d.toISOString().slice(0, 10)
 }
 
+// A shared plan link recreates the brief: /?to=LIS&arrive=2026-09-10&nights=5&budget=900
+function sharedBrief() {
+  if (typeof window === 'undefined') return null
+  const q = new URLSearchParams(window.location.search)
+  const to = q.get('to')?.toUpperCase()
+  const dest = to ? DESTINATIONS.find((d) => d.code === to) : null
+  if (!dest) return null
+  const num = (k: string, min: number, max: number, fallback: number) => {
+    const v = Number(q.get(k))
+    return Number.isFinite(v) && v >= min && v <= max ? Math.round(v) : fallback
+  }
+  const arrive = q.get('arrive')
+  return {
+    code: dest.code,
+    arriveBy: arrive && /^\d{4}-\d{2}-\d{2}$/.test(arrive) && arrive > isoInDays(0) ? arrive : isoInDays(14),
+    nights: num('nights', 1, 90, 5),
+    budget: num('budget', 50, 100000, 900),
+    adults: num('adults', 1, 9, 1),
+  }
+}
+const SHARED = sharedBrief()
+
 export default function App({
   defaultPriority = 'Balanced',
   mobileBreakpoint = 768,
   sceneClipUrls = '',
   homeCity = 'San Francisco',
 }: AppProps) {
-  const [screen, setScreen] = useState<Screen>('home')
+  // Arriving via a shared plan link drops straight into that trip's solve.
+  const [screen, setScreen] = useState<Screen>(SHARED ? 'planner' : 'home')
   const [priority, setPriority] = useState<Priority>(defaultPriority)
   const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
   const [query, setQuery] = useState('')
-  const [destCode, setDestCode] = useState<string | null>(null)
+  const [destCode, setDestCode] = useState<string | null>(SHARED?.code ?? null)
   const [call, setCall] = useState<CallState>('idle')
   const [shown, setShown] = useState<Record<string, boolean>>({})
   const [learned, setLearned] = useState<Record<string, boolean>>({})
 
   // The editable trip brief that every backend call is built from.
-  const [arriveBy, setArriveBy] = useState(() => isoInDays(14))
-  const [nights, setNights] = useState(5)
-  const [budget, setBudget] = useState(900)
-  const [adults, setAdults] = useState(1)
-  const [planActive, setPlanActive] = useState(false)
+  const [arriveBy, setArriveBy] = useState(() => SHARED?.arriveBy ?? isoInDays(14))
+  const [nights, setNights] = useState(SHARED?.nights ?? 5)
+  const [budget, setBudget] = useState(SHARED?.budget ?? 900)
+  const [adults, setAdults] = useState(SHARED?.adults ?? 1)
+  const [planActive, setPlanActive] = useState(!!SHARED)
   const [selected, setSelected] = useState<PlanOption | null>(null)
 
   const [companions, setCompanions] = useState<string[]>([])
@@ -491,6 +514,9 @@ export default function App({
               budget={budget}
               leaveBy={live.leaveBy}
               dest={dest}
+              arriveBy={arriveBy}
+              nights={nights}
+              userEmail={account.user?.email ?? null}
               hasPhrasePack={!!dest && !!PHRASES[dest.lang]}
               phrasesSaved={learnedCount}
               phrasesTotal={phrases.length}

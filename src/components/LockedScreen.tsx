@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Icon from './Icon'
 import TripPrep from './TripPrep'
 import type { PlanOption } from '../lib/api'
@@ -8,6 +9,9 @@ type Props = {
   budget: number
   leaveBy: string
   dest: Destination | null
+  arriveBy: string
+  nights: number
+  userEmail: string | null
   hasPhrasePack: boolean
   phrasesSaved: number
   phrasesTotal: number
@@ -17,11 +21,50 @@ type Props = {
   goHome: () => void
 }
 
+/** ICS-safe local datetime: the departure date with a HH:MM wall time. */
+function icsStamp(dateIso: string, hhmm: string) {
+  return dateIso.replace(/-/g, '') + 'T' + hhmm.replace(':', '') + '00'
+}
+
+function downloadIcs(option: PlanOption, dest: Destination, leaveBy: string) {
+  const departDate = option.departAt.slice(0, 10)
+  const departTime = option.departAt.slice(11, 16)
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Meguaz//Trip Plan//EN',
+    'BEGIN:VEVENT',
+    'UID:meguaz-leave-' + option.offerId + '@meguaz.com',
+    'DTSTART:' + icsStamp(departDate, leaveBy || option.leaveBy),
+    'DTEND:' + icsStamp(departDate, departTime),
+    'SUMMARY:Leave home — ' + dest.city + ' trip',
+    'DESCRIPTION:Door-to-gate plan by Meguaz. Flight departs ' + departTime + ' from ' + option.originAirport + '.',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:meguaz-flight-' + option.offerId + '@meguaz.com',
+    'DTSTART:' + icsStamp(departDate, departTime),
+    'DTEND:' + icsStamp(departDate, departTime),
+    'SUMMARY:Flight ' + option.originAirport + ' → ' + dest.code,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ]
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'meguaz-' + dest.code.toLowerCase() + '.ics'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function LockedScreen({
   option,
   budget,
   leaveBy,
   dest,
+  arriveBy,
+  nights,
+  userEmail,
   hasPhrasePack,
   phrasesSaved,
   phrasesTotal,
@@ -32,6 +75,33 @@ export default function LockedScreen({
 }: Props) {
   const under = option ? budget - option.cost : 0
   const departure = leaveBy || option?.leaveBy || '—'
+  const [shared, setShared] = useState(false)
+
+  const shareTrip = async () => {
+    if (!dest) return
+    const url =
+      window.location.origin +
+      '/?to=' + dest.code +
+      '&arrive=' + arriveBy +
+      '&nights=' + nights +
+      '&budget=' + budget
+    const payload = {
+      title: 'Meguaz — ' + dest.city + ' plan',
+      text: 'My ' + dest.city + ' trip, solved door to gate' + (option ? ' for $' + option.cost : '') + ':',
+      url,
+    }
+    try {
+      if (navigator.share) {
+        await navigator.share(payload)
+      } else {
+        await navigator.clipboard.writeText(url)
+        setShared(true)
+        setTimeout(() => setShared(false), 2500)
+      }
+    } catch {
+      /* user dismissed the share sheet */
+    }
+  }
 
   const stats = option
     ? [
@@ -72,7 +142,9 @@ export default function LockedScreen({
       </h1>
       <p style={{ fontSize: 14, color: 'var(--color-neutral-700)', margin: 0 }}>
         {option
-          ? 'Every leg timed against live fares. Confirmation sent to alex@email.com'
+          ? userEmail
+            ? 'Every leg timed against live fares — saved to your trips (' + userEmail + '). Complete the booking with the airline before fares move.'
+            : 'Every leg timed against live fares. Sign in to keep this plan in your trips.'
           : 'Pick a route first and the locked plan appears here.'}
       </p>
 
@@ -173,6 +245,8 @@ export default function LockedScreen({
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>
         <button
           className="glass hv-white"
+          onClick={() => option && dest && downloadIcs(option, dest, leaveBy)}
+          disabled={!option || !dest}
           style={{
             flex: '1 1 150px',
             display: 'flex',
@@ -185,13 +259,16 @@ export default function LockedScreen({
             fontSize: 13,
             color: 'var(--color-text)',
             cursor: 'pointer',
+            opacity: option && dest ? 1 : 0.5,
           }}
         >
           <Icon name="download" size={15} />
-          Save plan
+          Add to calendar
         </button>
         <button
           className="glass hv-white"
+          onClick={shareTrip}
+          disabled={!dest}
           style={{
             flex: '1 1 150px',
             display: 'flex',
@@ -202,12 +279,13 @@ export default function LockedScreen({
             borderRadius: 999,
             fontFamily: 'var(--font-heading)',
             fontSize: 13,
-            color: 'var(--color-text)',
+            color: shared ? 'var(--color-accent-2-700)' : 'var(--color-text)',
             cursor: 'pointer',
+            opacity: dest ? 1 : 0.5,
           }}
         >
-          <Icon name="share" size={15} />
-          Share
+          <Icon name={shared ? 'check' : 'share'} size={15} />
+          {shared ? 'Link copied' : 'Share'}
         </button>
         <button
           className="hv-accent"
