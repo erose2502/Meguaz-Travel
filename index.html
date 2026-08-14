@@ -49,7 +49,68 @@
   </head>
   <body>
     <!-- figma:body-start -->
-    <div id="root"></div>
+    <div id="root">
+      <style>
+        /* Boot state: replaced the instant React mounts. Self-contained so it
+           paints before any stylesheet or font arrives; the fade-in delay
+           keeps fast loads from ever flashing it. */
+        #mg-boot {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 16px;
+          background: #f5eee1;
+          opacity: 0;
+          animation: mg-boot-in 0.5s ease 0.25s forwards;
+        }
+        #mg-boot .orb {
+          width: 46px;
+          height: 46px;
+          border-radius: 999px;
+          background: radial-gradient(circle at 32% 28%, #9fd0c6, #305f59 72%);
+          box-shadow: 0 10px 26px -12px #305f59;
+          animation: mg-boot-breathe 1.6s ease-in-out infinite;
+        }
+        #mg-boot .word {
+          font-family: Caprasimo, system-ui, sans-serif;
+          font-size: 30px;
+          color: #2e2b25;
+        }
+        #mg-boot .hint {
+          font: 13px/1.4 system-ui, sans-serif;
+          color: #877f6f;
+        }
+        @keyframes mg-boot-in {
+          to {
+            opacity: 1;
+          }
+        }
+        @keyframes mg-boot-breathe {
+          0%,
+          100% {
+            transform: scale(1);
+            opacity: 0.9;
+          }
+          50% {
+            transform: scale(1.14);
+            opacity: 1;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          #mg-boot .orb {
+            animation: none;
+          }
+        }
+      </style>
+      <div id="mg-boot" role="status" aria-label="Loading Meguaz">
+        <div class="orb"></div>
+        <div class="word">Meguaz</div>
+        <div class="hint">Preparing your journeys…</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
     <!-- figma:body-end -->
   </body>
