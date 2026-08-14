@@ -419,6 +419,20 @@ export function bookFlight(params: {
   return post<BookingResult>('/api/book', params)
 }
 
+// ── Public runtime config ───────────────────────────────────────────────────
+
+export type AppConfig = { pixelId: string | null; facebookLogin: boolean }
+
+let configPromise: Promise<AppConfig> | null = null
+
+/** Server-driven feature flags; fetched once, shared by all callers. */
+export function appConfig(): Promise<AppConfig> {
+  configPromise ??= fetch('/api/config')
+    .then((res) => (res.ok ? res.json() : { pixelId: null, facebookLogin: false }))
+    .catch(() => ({ pixelId: null, facebookLogin: false }))
+  return configPromise
+}
+
 // ── Ad-funnel tracking (Meta) ───────────────────────────────────────────────
 
 export type TrackEvent = 'Search' | 'ViewContent' | 'InitiateCheckout'

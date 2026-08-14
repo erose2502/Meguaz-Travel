@@ -1,6 +1,7 @@
 // Loads the Meta Pixel only when the server has a pixel id configured
 // (GET /api/config), so turning tracking on or off never needs a frontend
 // rebuild — and no Meta script ever loads for deployments without one.
+import { appConfig } from './api'
 
 type Fbq = {
   (...args: unknown[]): void
@@ -13,9 +14,7 @@ type Fbq = {
 
 export async function initPixel(): Promise<void> {
   try {
-    const res = await fetch('/api/config')
-    if (!res.ok) return
-    const { pixelId } = (await res.json()) as { pixelId: string | null }
+    const { pixelId } = await appConfig()
     const w = window as unknown as { fbq?: Fbq; _fbq?: Fbq }
     if (!pixelId || w.fbq) return
 

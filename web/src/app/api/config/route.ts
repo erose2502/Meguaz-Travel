@@ -9,7 +9,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   return NextResponse.json(
-    { pixelId: process.env.META_PIXEL_ID || null },
+    {
+      pixelId: process.env.META_PIXEL_ID || null,
+      // Meta business verification takes weeks; the Facebook button only
+      // renders once the Supabase provider actually works.
+      facebookLogin: process.env.FACEBOOK_LOGIN_ENABLED === "true",
+    },
     { headers: { "Cache-Control": "public, max-age=300, s-maxage=3600" } }
   );
 }

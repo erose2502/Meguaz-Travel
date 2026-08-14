@@ -1,8 +1,8 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import Icon from './Icon'
 import Spinner from './Spinner'
 import { BACKDROPS } from '../data/media'
-import type { PlanOption } from '../lib/api'
+import { appConfig, type PlanOption } from '../lib/api'
 
 type Props = {
   option: PlanOption | null
@@ -83,6 +83,19 @@ export default function AuthGate({ option, destCity, onSignIn, onSignUp, onDone,
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [checkEmail, setCheckEmail] = useState(false)
+  // Hidden until Meta business verification is done and the flag is flipped —
+  // a sign-in button that dead-ends is worse than one fewer option.
+  const [facebookLogin, setFacebookLogin] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    appConfig().then((cfg) => {
+      if (alive) setFacebookLogin(cfg.facebookLogin)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -236,6 +249,7 @@ export default function AuthGate({ option, destCity, onSignIn, onSignUp, onDone,
           Continue with Google
         </button>
 
+        {facebookLogin && (
         <button
           type="button"
           className="hv-white"
@@ -264,6 +278,7 @@ export default function AuthGate({ option, destCity, onSignIn, onSignUp, onDone,
           <FacebookMark />
           Continue with Facebook
         </button>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 0' }}>
           <span style={{ flex: 1, height: 1, background: 'var(--color-divider)' }} />
