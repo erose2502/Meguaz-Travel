@@ -427,6 +427,18 @@ input[type='number'] {
   }
 }
 
+/* — journey sidebar: sticky only when the columns are truly side by side — */
+.mg-side-sticky {
+  position: static;
+}
+
+@media (min-width: 760px) {
+  .mg-side-sticky {
+    position: sticky;
+    top: 84px;
+  }
+}
+
 /* — voice-call orb: breathes while listening, ripples while speaking — */
 @keyframes mg-orb-breathe {
   0%,

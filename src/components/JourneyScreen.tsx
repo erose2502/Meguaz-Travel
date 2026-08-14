@@ -223,13 +223,14 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-start' }}>
-        {/* Budgets */}
+        {/* Budgets — pinned beside the tall plan on wide screens only; when
+            the columns stack on mobile, sticky would make the plan below
+            scroll up underneath this block. */}
         <div
+          className="mg-side-sticky"
           style={{
             flex: '1 1 250px',
             minWidth: 240,
-            position: 'sticky',
-            top: 84,
             display: 'flex',
             flexDirection: 'column',
             gap: 12,
