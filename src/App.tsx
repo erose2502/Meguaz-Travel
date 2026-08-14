@@ -7,6 +7,7 @@ import MobileNav from './components/MobileNav'
 
 // LiveKit's client library is ~1MB; load it only when a call actually starts.
 const AgentCall = lazy(() => import('./components/AgentCall'))
+import type { AgentBrief } from './components/AgentCall'
 import HomeScreen from './components/HomeScreen'
 import PlansScreen from './components/PlansScreen'
 import PlannerScreen from './components/PlannerScreen'
@@ -160,6 +161,15 @@ export default function App({
   // Meta Pixel loads only when the server has an id configured (/api/config).
   useEffect(() => {
     void initPixel()
+  }, [])
+
+  // Pre-warm the ~1MB LiveKit chunk once the app is idle, so tapping "call"
+  // pays only the token mint + room join — not a cold bundle download.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      void import('./components/AgentCall')
+    }, 5000)
+    return () => window.clearTimeout(t)
   }, [])
 
   // Motion: each screen's sections rise into place; the ambient blooms drift
@@ -371,6 +381,24 @@ export default function App({
   const pickPlan = (code: string, planNights?: number) => {
     setDestCode(code)
     if (planNights) setNights(planNights)
+    go('planner')()
+  }
+
+  // The voice agent solved a trip: mirror the spoken brief into the planner
+  // so the traveller watches their plan build while the call continues.
+  const onAgentBrief = (b: AgentBrief) => {
+    const q = (b.to ?? '').trim()
+    if (!q) return
+    const match =
+      DESTINATIONS.find((d) => d.code === q.toUpperCase()) ?? searchDestinations(q, DESTINATIONS)[0]
+    if (!match) return
+    setDestCode(match.code)
+    if (b.arrive && /^\d{4}-\d{2}-\d{2}$/.test(b.arrive) && b.arrive > isoInDays(0)) {
+      setArriveBy(b.arrive)
+    }
+    if (b.nights) setNights(Math.min(90, Math.max(1, Math.round(b.nights))))
+    if (b.budget) setBudget(Math.min(100000, Math.max(50, Math.round(b.budget))))
+    if (b.adults) setAdults(Math.min(9, Math.max(1, Math.round(b.adults))))
     go('planner')()
   }
 
@@ -762,7 +790,7 @@ export default function App({
 
         {call !== 'idle' && (
           <Suspense fallback={null}>
-            <AgentCall call={call} onEnd={endCall} />
+            <AgentCall call={call} onEnd={endCall} onBrief={onAgentBrief} scene={scenes[0] ?? null} />
           </Suspense>
         )}
 

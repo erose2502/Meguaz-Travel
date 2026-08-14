@@ -97,6 +97,9 @@ function FactTicker({ facts }: { facts: string[] }) {
   const [factIndex, setFactIndex] = useState(0)
   const [chars, setChars] = useState(0)
   const text = facts[factIndex]
+  // A hidden ghost of the longest fact reserves the tallest wrapped height up
+  // front, so the chip never resizes while a fact types out or rotates.
+  const longest = facts.reduce((a, b) => (b.length > a.length ? b : a), '')
 
   useEffect(() => {
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -147,9 +150,12 @@ function FactTicker({ facts }: { facts: string[] }) {
       <span aria-hidden="true" style={{ color: 'var(--color-accent-300)', flex: 'none', marginTop: 1 }}>
         ✦
       </span>
-      <span aria-hidden="true">
-        {text.slice(0, chars)}
-        <span className="mg-caret" />
+      <span aria-hidden="true" style={{ display: 'grid', flex: 1, minWidth: 0 }}>
+        <span style={{ gridArea: '1 / 1', visibility: 'hidden' }}>{longest}</span>
+        <span style={{ gridArea: '1 / 1' }}>
+          {text.slice(0, chars)}
+          <span className="mg-caret" />
+        </span>
       </span>
     </p>
   )
