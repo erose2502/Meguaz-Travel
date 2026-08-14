@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap');
+/* Fonts load from index.html with preconnect — an @import here would chain
+   a render-blocking cross-origin fetch behind the CSS itself. */
 @import 'tailwindcss';
 
 /* Organic — design-system tokens and component classes, ported from the

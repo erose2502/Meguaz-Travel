@@ -6,6 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title><!-- figma:title --></title>
     <!-- figma:head-end -->
+    <!-- Fonts in parallel with the bundle instead of chained behind the CSS. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap"
+    />
+    <!-- The hero's poster paints the first frame while videos defer. -->
+    <link rel="preload" as="image" href="/media/plan-fjords.jpg" fetchpriority="high" />
   </head>
   <body>
     <!-- figma:body-start -->
