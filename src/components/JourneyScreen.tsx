@@ -380,7 +380,17 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
         {/* Door-to-gate plan — one itinerary document with a continuous spine,
             not a stack of cards. The flight is the centrepiece. */}
         <div style={{ flex: '2.4 1 400px', minWidth: 280 }}>
-          <h2 style={{ fontSize: 'clamp(18px,2vw,24px)', margin: '0 0 12px' }}>Your door-to-gate plan</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, margin: '0 0 12px' }}>
+            <h2 style={{ fontSize: 'clamp(18px,2vw,24px)', margin: 0 }}>Your door-to-gate plan</h2>
+            {/* Real fare allowance from the airline, not boilerplate. */}
+            <span className="tag tag-accent-2" style={{ fontSize: 11.5, fontWeight: 700 }}>
+              {option.bags.checked > 0
+                ? `${option.bags.carryOn || 1} carry-on + ${option.bags.checked} checked included`
+                : option.bags.feeAdded > 0
+                  ? `Carry-on fare · checked bag added ($${option.bags.feeAdded} est.)`
+                  : `Carry-on only fare`}
+            </span>
+          </div>
 
           <div
             className="glass-strong grain"

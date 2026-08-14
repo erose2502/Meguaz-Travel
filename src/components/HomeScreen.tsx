@@ -36,6 +36,8 @@ type Props = {
   onCabinClass: (c: CabinClass) => void
   transfer: TransferMode
   onTransfer: (mode: TransferMode) => void
+  checkedBag: boolean
+  onCheckedBag: (v: boolean) => void
   onSolve: () => void
   solving: boolean
   originAirport: string
@@ -371,6 +373,8 @@ export default function HomeScreen(props: Props) {
     onCabinClass,
     transfer,
     onTransfer,
+    checkedBag,
+    onCheckedBag,
     onSolve,
     solving,
     originAirport,
@@ -489,6 +493,8 @@ export default function HomeScreen(props: Props) {
           onCabinClass={onCabinClass}
           transfer={transfer}
           onTransfer={onTransfer}
+          checkedBag={checkedBag}
+          onCheckedBag={onCheckedBag}
           onSubmit={onSolve}
           submitting={solving}
         />

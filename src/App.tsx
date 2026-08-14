@@ -146,6 +146,7 @@ export default function App({
   const [companions, setCompanions] = useState<string[]>([])
   const [cabinClass, setCabinClass] = useState<CabinClass>('economy')
   const [transfer, setTransfer] = useState<TransferMode>('rideshare')
+  const [checkedBag, setCheckedBag] = useState(false)
   const [originIata, setOriginIata] = useState<string | null>(null)
   const account = useAccount()
   const tripsState = useTrips(!!account.user)
@@ -252,6 +253,7 @@ export default function App({
     nights,
     airportTransfer: transfer,
     cabinClass,
+    checkedBag,
     ...(home.coords && departureIsNearby ? { originCoords: home.coords } : {}),
   }
   const { plan, loading, refreshing, error, lastUpdated, refresh } = useTripPlan(brief, planActive)
@@ -535,6 +537,8 @@ export default function App({
               onCabinClass={setCabinClass}
               transfer={transfer}
               onTransfer={setTransfer}
+              checkedBag={checkedBag}
+              onCheckedBag={setCheckedBag}
               onSolve={go('planner')}
               solving={loading}
               originAirport={originAirport}

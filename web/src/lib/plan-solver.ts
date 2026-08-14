@@ -315,7 +315,19 @@ export function buildOption(
         : mode === "dropoff"
           ? 0
           : TRANSFER.transitCost;
-  const total = flightCost + toAirportCost + ground.cost;
+  // Luggage: airlines charge checked bags per direction. When the traveller
+  // wants one and the fare includes none, price it honestly instead of
+  // letting it ambush them at check-in. $35/direction is the industry mode.
+  const wantsChecked = Boolean(brief.checkedBag);
+  const bagFee =
+    wantsChecked && offer.bags.checked === 0
+      ? 35 * brief.adults * (roundTrip ? 2 : 1)
+      : 0;
+  // Bag drop is real minutes: queue, tag, hand off.
+  const bagDropMin = wantsChecked ? 12 : 0;
+  const checkinMin = TRANSFER.checkinMin + bagDropMin;
+
+  const total = flightCost + toAirportCost + ground.cost + bagFee;
 
   const TRANSFER_COPY: Record<
     typeof mode,
@@ -355,7 +367,7 @@ export function buildOption(
   const depart = new Date(slice.departingAt);
   const arrive = new Date(slice.arrivingAt);
   const preFlightMin =
-    toAirportMin + TRANSFER.checkinMin + TRANSFER.securityWaitMin + lane.bufferMin;
+    toAirportMin + checkinMin + TRANSFER.securityWaitMin + lane.bufferMin;
   const leaveHome = new Date(depart.getTime() - preFlightMin * 60_000);
   const doorClose = new Date(
     arrive.getTime() + (TRANSFER.borderMin + ground.minutes) * 60_000
@@ -385,10 +397,13 @@ export function buildOption(
       detail: transfer.stepDetail, cost: null, kind: "normal", note: null,
     },
     {
-      id: "checkin", icon: "checkin", time: `${hm(addMin(leaveHome, toAirportMin))} → ${hm(addMin(leaveHome, toAirportMin + TRANSFER.checkinMin))}`,
-      label: "Check-in & security",
+      id: "checkin", icon: "checkin", time: `${hm(addMin(leaveHome, toAirportMin))} → ${hm(addMin(leaveHome, toAirportMin + checkinMin))}`,
+      label: wantsChecked ? "Bag drop, check-in & security" : "Check-in & security",
       location: `${slice.origin} · average wait ${TRANSFER.securityWaitMin} min`,
-      detail: "Have your ID and boarding pass ready", cost: null, kind: "normal", note: null,
+      detail: wantsChecked
+        ? `Bag drop first (~${bagDropMin} min padded in) — then ID and boarding pass ready`
+        : "Have your ID and boarding pass ready",
+      cost: null, kind: "normal", note: null,
     },
     {
       id: "buffer", icon: "buffer", time: `${lane.bufferMin}-min buffer`,
@@ -444,6 +459,13 @@ export function buildOption(
     { label: transfer.costLabel, amount: toAirportCost, color: "#FF7A00" },
     { label: ground.leg ? `${title(ground.leg.mode)} into city` : "Transport into city", amount: ground.cost, color: "#2FB4B4" },
   ];
+  if (bagFee > 0) {
+    costBreakdown.push({
+      label: `Checked bag${brief.adults > 1 ? "s" : ""} · ${roundTrip ? "both ways" : "one way"} (est.)`,
+      amount: bagFee,
+      color: "#8E6BB8",
+    });
+  }
 
   return {
     id,
@@ -469,11 +491,12 @@ export function buildOption(
     steps,
     costBreakdown,
     offerId: offer.id,
+    bags: { carryOn: offer.bags.carryOn, checked: offer.bags.checked, feeAdded: bagFee },
     etaFromLocation: Boolean(drive),
     etaTrafficAware: Boolean(drive?.trafficAware),
     originAirport: slice.origin,
     departAt: depart.toISOString(),
-    preTransferMin: TRANSFER.checkinMin + TRANSFER.securityWaitMin + lane.bufferMin,
+    preTransferMin: checkinMin + TRANSFER.securityWaitMin + lane.bufferMin,
   };
 }
 

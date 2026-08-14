@@ -23,6 +23,7 @@ const offer = (over: Partial<FlightOffer> = {}): FlightOffer => ({
   totalAmount: "500",
   totalCurrency: "USD",
   owner: "Meguaz Air",
+  bags: { carryOn: 1, checked: 0 },
   slices: [slice()],
   ...over,
 });
@@ -49,6 +50,23 @@ describe("buildOption cost maths", () => {
     const opt = buildOption("balanced", "Best overall", "t", offer(), brief(), "balanced", drive, ground);
     const sum = opt.costBreakdown.reduce((acc, line) => acc + line.amount, 0);
     expect(sum).toBe(opt.cost);
+  });
+
+  it("prices an estimated checked-bag fee when wanted but not included", () => {
+    const opt = buildOption(
+      "frugal", "Cheapest overall", "t", offer(), brief({ checkedBag: true }), "money", drive, ground);
+    expect(opt.cost).toBe(500 + 25 + 20 + 35); // one-way fare → one $35 fee
+    expect(opt.bags.feeAdded).toBe(35);
+    const sum = opt.costBreakdown.reduce((acc, line) => acc + line.amount, 0);
+    expect(sum).toBe(opt.cost);
+  });
+
+  it("adds no bag fee when the fare already includes a checked bag", () => {
+    const withBag = offer({ bags: { carryOn: 1, checked: 1 } });
+    const opt = buildOption(
+      "frugal", "Cheapest overall", "t", withBag, brief({ checkedBag: true }), "money", drive, ground);
+    expect(opt.cost).toBe(500 + 25 + 20);
+    expect(opt.bags).toEqual({ carryOn: 1, checked: 1, feeAdded: 0 });
   });
 
   it("falls back to static transfer estimates when no live drive exists", () => {

@@ -22,6 +22,8 @@ export type FlightOffer = {
   totalAmount: string;
   totalCurrency: string;
   owner: string;
+  /** Per-passenger baggage the fare includes (from the first segment). */
+  bags: { carryOn: number; checked: number };
   slices: Array<{
     origin: string;
     destination: string;
@@ -32,6 +34,19 @@ export type FlightOffer = {
     carriers: string[];
   }>;
 };
+
+type SegmentPassenger = { baggages?: Array<{ type?: string; quantity?: number }> };
+
+function includedBags(offer: { slices?: unknown[] }): FlightOffer["bags"] {
+  const seg = (offer.slices?.[0] as { segments?: Array<{ passengers?: SegmentPassenger[] }> })
+    ?.segments?.[0];
+  const bags = { carryOn: 0, checked: 0 };
+  for (const b of seg?.passengers?.[0]?.baggages ?? []) {
+    if (b.type === "carry_on") bags.carryOn += b.quantity ?? 0;
+    else if (b.type === "checked") bags.checked += b.quantity ?? 0;
+  }
+  return bags;
+}
 
 export async function searchFlights(params: FlightSearchParams): Promise<FlightOffer[]> {
   await assertSpendCap("duffel");
@@ -60,6 +75,7 @@ export async function searchFlights(params: FlightSearchParams): Promise<FlightO
     totalAmount: o.total_amount,
     totalCurrency: o.total_currency,
     owner: o.owner?.name ?? "Unknown airline",
+    bags: includedBags(o),
     slices: (o.slices ?? []).map((s) => ({
       origin: s.origin?.iata_code ?? "",
       destination: s.destination?.iata_code ?? "",

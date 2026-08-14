@@ -29,6 +29,9 @@ export type TripBrief = {
   nights?: number;
   /** Fare class the traveller wants priced. */
   cabinClass?: "economy" | "premium_economy" | "business" | "first";
+  /** Travelling with a checked bag: prices the fee when the fare includes
+   * none, and pads bag-drop time into the airport plan. */
+  checkedBag?: boolean;
   // When present, the solver uses a real drive ETA from here to the departure
   // airport instead of a static estimate, sharpening "leave home by".
   originCoords?: { lat: number; lng: number };
@@ -66,6 +69,9 @@ export type PlanOption = {
   steps: TimelineStep[];
   costBreakdown: CostLine[];
   offerId: string | null; // Duffel offer backing the flight leg
+  /** What the fare includes per traveller, plus any estimated checked-bag fee
+   * the solver added because the traveller wants one and the fare has none. */
+  bags: { carryOn: number; checked: number; feeAdded: number };
   /** True when leave-by used a real drive ETA from the user's location. */
   etaFromLocation: boolean;
   etaTrafficAware: boolean;

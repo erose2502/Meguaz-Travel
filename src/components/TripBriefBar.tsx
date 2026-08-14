@@ -40,6 +40,8 @@ type Props = {
   onCabinClass: (c: CabinClass) => void
   transfer: TransferMode
   onTransfer: (mode: TransferMode) => void
+  checkedBag: boolean
+  onCheckedBag: (v: boolean) => void
   onSubmit: () => void
   submitting: boolean
 }
@@ -160,6 +162,8 @@ export default function TripBriefBar(props: Props) {
     onCabinClass,
     transfer,
     onTransfer,
+    checkedBag,
+    onCheckedBag,
     onSubmit,
     submitting,
   } = props
@@ -560,6 +564,32 @@ export default function TripBriefBar(props: Props) {
             <option value="drive">Drive & park</option>
             <option value="dropoff">Drop-off</option>
             <option value="transit">Transit</option>
+          </select>
+        </span>
+
+        {/* Luggage changes the fare (bag fees) and the airport clock (bag drop) */}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-neutral-700)' }}>
+          Luggage
+          <select
+            value={checkedBag ? 'checked' : 'carryon'}
+            onChange={(e) => onCheckedBag(e.target.value === 'checked')}
+            aria-label="Luggage"
+            style={{
+              height: 30,
+              padding: '0 10px',
+              borderRadius: 999,
+              border: '1px solid var(--color-divider)',
+              background: 'rgba(255,255,255,0.6)',
+              font: 'inherit',
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'var(--color-text)',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <option value="carryon">Carry-on only</option>
+            <option value="checked">+ Checked bag</option>
           </select>
         </span>
 

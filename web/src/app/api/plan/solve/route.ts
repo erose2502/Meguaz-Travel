@@ -14,6 +14,7 @@ const schema = z.object({
   nights: z.number().int().min(1).max(90).optional(),
   airportTransfer: z.enum(["rideshare", "drive", "dropoff", "transit"]).optional(),
   cabinClass: z.enum(["economy", "premium_economy", "business", "first"]).optional(),
+  checkedBag: z.boolean().optional(),
   originCoords: z
     .object({
       lat: z.number().min(-90).max(90),

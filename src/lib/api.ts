@@ -35,6 +35,8 @@ export type PlanOption = {
   steps: TimelineStep[]
   costBreakdown: CostLine[]
   offerId: string | null
+  /** Fare's per-traveller baggage allowance + any estimated fee added. */
+  bags: { carryOn: number; checked: number; feeAdded: number }
   etaFromLocation: boolean
   etaTrafficAware: boolean
   originAirport: string
@@ -57,6 +59,8 @@ export type TripBrief = {
   /** How the traveller gets to the departure airport; defaults to rideshare. */
   airportTransfer?: TransferMode
   cabinClass?: CabinClass
+  /** Checked bag wanted: prices the fee when the fare includes none. */
+  checkedBag?: boolean
   originCoords?: { lat: number; lng: number }
 }
 
