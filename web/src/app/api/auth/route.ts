@@ -73,10 +73,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ user: shape(data.user) });
     }
 
+    // Always seed a display name — a nameless profile is invisible in
+    // community search. The email's local part is an honest default.
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: displayName ? { display_name: displayName } : undefined },
+      options: { data: { display_name: displayName ?? email.split("@")[0] } },
     });
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });

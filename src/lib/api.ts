@@ -352,13 +352,28 @@ export type CommunityUser = {
   following: boolean
 }
 
+export type CommunityFeedItem = {
+  id: string
+  destinationCode: string
+  rating: number
+  title: string | null
+  body: string | null
+  createdAt: string
+  author: { name: string; avatarUrl: string | null }
+}
+
 export async function searchCommunity(q: string, signal?: AbortSignal) {
   const res = await fetch('/api/community?q=' + encodeURIComponent(q), { signal })
   if (!res.ok) {
     const detail = await res.json().catch(() => null)
     throw new ApiError(detail?.error || 'Community unavailable', res.status)
   }
-  return (await res.json()) as { users: CommunityUser[] }
+  // discover + feed only arrive on the empty-query "home" response.
+  return (await res.json()) as {
+    users: CommunityUser[]
+    discover?: CommunityUser[]
+    feed?: CommunityFeedItem[]
+  }
 }
 
 export function setFollowing(userId: string, follow: boolean) {

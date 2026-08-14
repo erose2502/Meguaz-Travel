@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { admin, adminAvailable } from "@/lib/supabase/admin";
 import { publicOrigin } from "@/lib/public-origin";
 import { captureServerError } from "@/lib/monitoring";
 
@@ -18,6 +19,33 @@ export async function GET(request: NextRequest) {
       const supabase = await createClient();
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error) {
+        // OAuth providers put the name in full_name/name, but the signup
+        // trigger only copies display_name — without this backfill, Google
+        // users are invisible in community search. Never blocks the login.
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          const u = userData?.user;
+          if (u && adminAvailable()) {
+            const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+            const derived = String(
+              meta.display_name ?? meta.full_name ?? meta.name ?? u.email?.split("@")[0] ?? ""
+            ).trim();
+            if (derived) {
+              const { data: prof } = await admin()
+                .from("profiles")
+                .select("display_name")
+                .eq("id", u.id)
+                .maybeSingle();
+              if (!prof?.display_name) {
+                await admin()
+                  .from("profiles")
+                  .upsert({ id: u.id, display_name: derived }, { onConflict: "id" });
+              }
+            }
+          }
+        } catch (err) {
+          captureServerError("auth-callback-profile", err);
+        }
         return NextResponse.redirect(resolveNext(next, pub));
       }
       captureServerError("auth-callback", error);

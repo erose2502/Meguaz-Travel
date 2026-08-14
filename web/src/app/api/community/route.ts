@@ -16,6 +16,16 @@ export type CommunityUser = {
   following: boolean;
 };
 
+export type CommunityFeedItem = {
+  id: string;
+  destinationCode: string;
+  rating: number;
+  title: string | null;
+  body: string | null;
+  createdAt: string;
+  author: { name: string; avatarUrl: string | null };
+};
+
 export async function GET(req: NextRequest) {
   const g = await guard(req, "search");
   if (!g.ok) return g.response;
@@ -34,7 +44,15 @@ export async function GET(req: NextRequest) {
       .eq("follower_id", g.caller.userId);
     const followed = new Set((myFollows ?? []).map((f) => f.followee_id as string));
 
-    let rows: Array<{ id: string; display_name: string | null; avatar_url: string | null }> = [];
+    type Row = { id: string; display_name: string | null; avatar_url: string | null };
+    const toUser = (r: Row): CommunityUser => ({
+      id: r.id,
+      // Backfilled going forward, but never let a null name hide someone.
+      name: r.display_name ?? "Traveller",
+      avatarUrl: r.avatar_url,
+      following: followed.has(r.id),
+    });
+
     if (q) {
       const { data } = await admin()
         .from("profiles")
@@ -42,25 +60,56 @@ export async function GET(req: NextRequest) {
         .ilike("display_name", `%${q}%`)
         .neq("id", g.caller.userId)
         .limit(20);
-      rows = data ?? [];
-    } else if (followed.size > 0) {
-      // No query → the people you already follow.
+      return NextResponse.json({ users: (data ?? []).map(toUser) });
+    }
+
+    // No query → your circle, plus fresh faces and the latest reviews, so
+    // the tab has something alive in it before anyone types a name.
+    let users: CommunityUser[] = [];
+    if (followed.size > 0) {
       const { data } = await admin()
         .from("profiles")
         .select("id, display_name, avatar_url")
         .in("id", [...followed]);
-      rows = data ?? [];
+      users = (data ?? []).map(toUser);
     }
 
-    const users: CommunityUser[] = rows
-      .filter((r) => r.display_name)
-      .map((r) => ({
-        id: r.id,
-        name: r.display_name as string,
-        avatarUrl: r.avatar_url,
-        following: followed.has(r.id),
-      }));
-    return NextResponse.json({ users });
+    const { data: newest } = await admin()
+      .from("profiles")
+      .select("id, display_name, avatar_url")
+      .neq("id", g.caller.userId)
+      .order("created_at", { ascending: false })
+      .limit(12);
+    const discover = (newest ?? []).map(toUser);
+
+    const { data: reviews } = await admin()
+      .from("reviews")
+      .select("id, user_id, destination_code, rating, title, body, created_at")
+      .order("created_at", { ascending: false })
+      .limit(12);
+    const authorIds = [...new Set((reviews ?? []).map((r) => r.user_id as string))];
+    const authors = new Map<string, Row>();
+    if (authorIds.length > 0) {
+      const { data: profs } = await admin()
+        .from("profiles")
+        .select("id, display_name, avatar_url")
+        .in("id", authorIds);
+      for (const p of profs ?? []) authors.set(p.id, p);
+    }
+    const feed: CommunityFeedItem[] = (reviews ?? []).map((r) => {
+      const a = authors.get(r.user_id as string);
+      return {
+        id: r.id as string,
+        destinationCode: r.destination_code as string,
+        rating: r.rating as number,
+        title: (r.title as string) ?? null,
+        body: (r.body as string) ?? null,
+        createdAt: r.created_at as string,
+        author: { name: a?.display_name ?? "Traveller", avatarUrl: a?.avatar_url ?? null },
+      };
+    });
+
+    return NextResponse.json({ users, discover, feed });
   } catch (err) {
     captureServerError("community-search", err);
     return failure("Community is unavailable right now");
