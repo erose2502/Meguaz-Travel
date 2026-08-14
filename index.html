@@ -6,15 +6,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title><!-- figma:title --></title>
     <!-- figma:head-end -->
-    <!-- Fonts in parallel with the bundle instead of chained behind the CSS. -->
+    <!-- Fonts load async (print→all swap): a slow fonts.googleapis.com must
+         never block first paint — text renders in fallbacks, then swaps. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap"
+      />
+    </noscript>
     <!-- The hero's poster paints the first frame while videos defer. -->
     <link rel="preload" as="image" href="/media/plan-fjords.jpg" fetchpriority="high" />
+    <script>
+      // Self-heal for stale shells: if the app bundle 404s or arrives as the
+      // wrong type after a deploy rotated the hashes, pull a fresh shell once
+      // instead of leaving a blank page.
+      window.addEventListener(
+        'error',
+        function (e) {
+          var t = e.target
+          if (
+            t &&
+            t.tagName === 'SCRIPT' &&
+            t.src &&
+            t.src.indexOf('/assets/') !== -1 &&
+            !sessionStorage.getItem('mg-reloaded')
+          ) {
+            sessionStorage.setItem('mg-reloaded', '1')
+            location.reload()
+          }
+        },
+        true
+      )
+    </script>
   </head>
   <body>
     <!-- figma:body-start -->

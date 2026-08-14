@@ -31,9 +31,14 @@ type Props = {
 
 /** Attraction photo via its Wikipedia article — stable, embeddable, free. */
 function WikiPhoto({ title, alt }: { title: string | null; alt: string }) {
-  const [src, setSrc] = useState<string | null>(null)
+  // Try the sharper 640px rendition first, but keep the API's own thumbnail
+  // as a fallback — the upscale 400s on some images (SVG-derived thumbs),
+  // and a slightly soft photo beats a gradient placeholder.
+  const [candidates, setCandidates] = useState<string[]>([])
+  const [idx, setIdx] = useState(0)
   useEffect(() => {
-    setSrc(null)
+    setCandidates([])
+    setIdx(0)
     if (!title) return
     const controller = new AbortController()
     fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title), {
@@ -42,12 +47,15 @@ function WikiPhoto({ title, alt }: { title: string | null; alt: string }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         const thumb: string | undefined = j?.thumbnail?.source
-        if (thumb) setSrc(thumb.replace(/\/\d+px-/, '/640px-'))
+        if (!thumb) return
+        const big = thumb.replace(/\/\d+px-/, '/640px-')
+        setCandidates(big !== thumb ? [big, thumb] : [thumb])
       })
       .catch(() => {})
     return () => controller.abort()
   }, [title])
 
+  const src = candidates[idx] ?? null
   if (!src) {
     return (
       <div
@@ -66,7 +74,7 @@ function WikiPhoto({ title, alt }: { title: string | null; alt: string }) {
       src={src}
       alt={alt}
       loading="lazy"
-      onError={() => setSrc(null)}
+      onError={() => setIdx((i) => i + 1)}
       style={{ width: '100%', height: 128, objectFit: 'cover', display: 'block' }}
     />
   )

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { guard } from "@/lib/security/guard";
+import { publicOrigin } from "@/lib/public-origin";
 import { captureServerError } from "@/lib/monitoring";
 
 // Starts the Google OAuth flow (provider configured in Supabase).
@@ -16,25 +17,26 @@ export async function GET(req: NextRequest) {
   if (!g.ok) return g.response;
 
   const url = new URL(req.url);
-  const next = sanitizeNext(url.searchParams.get("next"), url);
+  const pub = publicOrigin(req);
+  const next = sanitizeNext(url.searchParams.get("next"), pub);
 
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${url.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        redirectTo: `${pub.origin}/auth/callback?next=${encodeURIComponent(next)}`,
         skipBrowserRedirect: true,
       },
     });
     if (error || !data?.url) {
       captureServerError("auth-google", error ?? new Error("no provider url"));
-      return NextResponse.redirect(`${url.origin}/login?error=google`);
+      return NextResponse.redirect(`${pub.origin}/login?error=google`);
     }
     return NextResponse.redirect(data.url);
   } catch (err) {
     captureServerError("auth-google", err);
-    return NextResponse.redirect(`${url.origin}/login?error=google`);
+    return NextResponse.redirect(`${pub.origin}/login?error=google`);
   }
 }
 

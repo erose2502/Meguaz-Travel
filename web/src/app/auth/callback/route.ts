@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { publicOrigin } from "@/lib/public-origin";
 import { captureServerError } from "@/lib/monitoring";
 
 // OAuth landing: Supabase redirects here with ?code= after Google consent.
@@ -8,22 +9,23 @@ import { captureServerError } from "@/lib/monitoring";
 // but is re-checked here because this URL is also attacker-constructable).
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
+  const pub = publicOrigin(request);
   const code = url.searchParams.get("code");
-  const next = sanitizeNext(url.searchParams.get("next"), url);
+  const next = sanitizeNext(url.searchParams.get("next"), pub);
 
   if (code) {
     try {
       const supabase = await createClient();
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error) {
-        return NextResponse.redirect(resolveNext(next, url));
+        return NextResponse.redirect(resolveNext(next, pub));
       }
       captureServerError("auth-callback", error);
     } catch (err) {
       captureServerError("auth-callback", err);
     }
   }
-  return NextResponse.redirect(new URL("/login?error=oauth", request.url));
+  return NextResponse.redirect(new URL("/login?error=oauth", pub));
 }
 
 function sanitizeNext(raw: string | null, reqUrl: URL): string {
