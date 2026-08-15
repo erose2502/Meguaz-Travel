@@ -1,0 +1,13 @@
+{
+  "name": "Meguaz — Your journey, perfected",
+  "short_name": "Meguaz",
+  "description": "Real fares, door-to-gate plans, and everything for the trip in one place.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#f5ead8",
+  "background_color": "#10201f",
+  "icons": [
+    { "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
