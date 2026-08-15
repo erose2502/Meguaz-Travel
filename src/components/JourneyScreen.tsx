@@ -259,7 +259,16 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
   const tripTotal = option.cost + (stayTotal ?? 0)
   const under = budget - tripTotal
   const overBudget = under < 0
-  const total = option.costBreakdown.reduce((sum, line) => sum + line.amount, 0) || option.cost
+  // The money card shows the same math as the verdict: travel lines plus the
+  // stay estimate as its own segment.
+  const costLines =
+    stayTotal != null
+      ? [
+          ...option.costBreakdown,
+          { label: 'Stay (est.)', amount: stayTotal, color: 'var(--color-accent-2-500)' },
+        ]
+      : option.costBreakdown
+  const total = costLines.reduce((sum, line) => sum + line.amount, 0) || tripTotal
 
   return (
     <div data-screen-label="Journey">
@@ -329,7 +338,7 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
               </span>
             </div>
             <p style={{ fontFamily: 'var(--font-heading)', fontSize: 30, lineHeight: 1, margin: '10px 0 0' }}>
-              ${option.cost}
+              ${tripTotal}
               <span
                 style={{
                   fontFamily: 'var(--font-body)',
@@ -352,7 +361,7 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
                 margin: '12px 0 10px',
               }}
             >
-              {option.costBreakdown.map((line) => (
+              {costLines.map((line) => (
                 <span
                   key={line.label}
                   style={{
@@ -363,7 +372,7 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
               ))}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {option.costBreakdown.map((line) => (
+              {costLines.map((line) => (
                 <div key={line.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ width: 8, height: 8, borderRadius: 999, background: line.color }} />
                   <span style={{ flex: 1, fontSize: 12, color: 'var(--color-neutral-700)' }}>{line.label}</span>
