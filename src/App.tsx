@@ -620,6 +620,7 @@ export default function App({
 
           {screen === 'journey' && (
             <JourneyScreen
+              transfer={transfer}
               option={selected}
               routeLabel={plan?.routeLabel ?? ''}
               budget={budget}

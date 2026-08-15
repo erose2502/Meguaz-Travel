@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import Icon, { type IconName } from './Icon'
-import { weatherForecast, type PlanOption, type Weather } from '../lib/api'
+import { searchAirports, weatherForecast, type PlanOption, type TransferMode, type Weather } from '../lib/api'
+import { uberRideLink } from '../lib/uber'
 import type { LiveLeaveBy } from '../lib/useTripPlan'
 
 type Props = {
@@ -10,6 +11,8 @@ type Props = {
   live: LiveLeaveBy
   /** Destination airport code + city, for the on-arrival weather card. */
   dest: { city: string; code: string } | null
+  /** Chosen airport-transfer mode; rideshare legs get a one-tap Uber link. */
+  transfer: TransferMode
   goPlanner: () => void
   goLocked: () => void
 }
@@ -151,7 +154,24 @@ const STEP_ICON: Record<string, IconName> = {
   train: 'tram',
 }
 
-export default function JourneyScreen({ option, routeLabel, budget, live, dest, goPlanner, goLocked }: Props) {
+export default function JourneyScreen({ option, routeLabel, budget, live, dest, transfer, goPlanner, goLocked }: Props) {
+  // Departure-airport coordinates power the one-tap Uber deep link on the
+  // rideshare leg. Resolved lazily from the airport index by exact IATA.
+  const [uberDrop, setUberDrop] = useState<{ lat: number; lng: number; name: string } | null>(null)
+  const originAirport = option?.originAirport ?? null
+  useEffect(() => {
+    setUberDrop(null)
+    if (!originAirport || transfer !== 'rideshare') return
+    const controller = new AbortController()
+    searchAirports(originAirport, null, controller.signal)
+      .then((r) => {
+        const hit = r.airports.find((a) => a.iata === originAirport)
+        if (hit) setUberDrop({ lat: hit.lat, lng: hit.lng, name: hit.name + ' Airport' })
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [originAirport, transfer])
+
   if (!option) {
     return (
       <div data-screen-label="Journey" style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center' }}>
@@ -516,6 +536,31 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
                           {step.location && step.detail ? ' · ' : ''}
                           {step.detail}
                         </p>
+                        {step.icon === 'car' &&
+                          uberDrop &&
+                          i < option.steps.findIndex((s) => s.kind === 'main') && (
+                            <a
+                              href={uberRideLink(uberDrop)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 7,
+                                marginTop: 8,
+                                padding: '8px 14px',
+                                borderRadius: 999,
+                                background: '#000',
+                                color: '#fff',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                textDecoration: 'none',
+                              }}
+                            >
+                              <Icon name="car" size={14} color="#fff" />
+                              Request Uber to {option.originAirport}
+                            </a>
+                          )}
                       </>
                     )}
                     {step.note && (

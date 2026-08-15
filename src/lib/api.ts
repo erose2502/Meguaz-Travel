@@ -64,7 +64,13 @@ export type TripBrief = {
   originCoords?: { lat: number; lng: number }
 }
 
-export type NearbyAirport = { iata: string; name: string; distanceKm: number | null }
+export type NearbyAirport = {
+  iata: string
+  name: string
+  lat: number
+  lng: number
+  distanceKm: number | null
+}
 
 export type StayEstimate = {
   nightlyUsd: number
