@@ -35,9 +35,9 @@ export default function Header({ screen, isWide, onNavigate, user, avatarUrl, on
         // itself back out of the status bar.
         padding: 'clamp(10px,1.6vw,18px) clamp(14px,3vw,40px)',
         paddingTop: 'calc(clamp(10px,1.6vw,18px) + env(safe-area-inset-top, 0px))',
-        background: 'rgba(250,242,229,0.52)',
-        backdropFilter: 'blur(34px) saturate(200%)',
-        WebkitBackdropFilter: 'blur(34px) saturate(200%)',
+        // Fully opaque: content scrolling underneath must never ghost through
+        // the navigation. Solid ground, no blur needed.
+        background: '#faf2e5',
         borderBottom: '1px solid rgba(255,255,255,0.45)',
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75), 0 12px 28px -22px rgba(46,43,37,0.5)',
       }}
