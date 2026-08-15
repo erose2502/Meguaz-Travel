@@ -93,6 +93,21 @@ body {
   overflow-x: clip;
 }
 
+/* Full-bleed shell: 100vh is the *large* viewport on phones, so it can sit
+   wrong while the URL bar shows; dvh tracks the chrome as it collapses.
+   Split across @supports because the minifier collapses same-property
+   fallback pairs down to the last value, stranding pre-15.4 Safari. */
+#root,
+.mg-viewport-fill {
+  min-height: 100vh;
+}
+@supports (min-height: 100dvh) {
+  #root,
+  .mg-viewport-fill {
+    min-height: 100dvh;
+  }
+}
+
 /* iOS zooms the whole page when focusing an input whose font is under 16px —
    and the zoom sticks, cutting off the right side of every screen after.
    Inline styles set 14px for desktop aesthetics; on touch screens 16px wins. */

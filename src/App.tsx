@@ -434,9 +434,9 @@ export default function App({
 
   return (
     <div
+      className="mg-viewport-fill"
       style={{
         position: 'relative',
-        minHeight: '100vh',
         background: 'var(--color-bg)',
         color: 'var(--color-text)',
         fontFamily: 'var(--font-body)',

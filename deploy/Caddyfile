@@ -35,7 +35,20 @@ meguaz.com {
 	# check, and sit on a blank page.
 	handle /assets/* {
 		root * /srv/app
-		header Cache-Control "public, max-age=31536000, immutable"
+		# Only files that exist earn the immutable header. A 404 carrying
+		# max-age=1y gets pinned by Cloudflare's edge for a year — after
+		# which no deploy can ever heal that URL for that colo.
+		@exists file
+		header @exists Cache-Control "public, max-age=31536000, immutable"
+		header ?Cache-Control "no-store"
+		# A request for a hashed .js we no longer have = a stale cached
+		# shell. Serve the reloader stub (valid JS, correct MIME) so the
+		# client pulls the current shell instead of dying on a blank page.
+		@stalejs {
+			path *.js
+			not file
+		}
+		rewrite @stalejs /assets-reloader.js
 		file_server
 	}
 
@@ -45,7 +58,9 @@ meguaz.com {
 	# video leaves this box roughly once per week total.
 	handle /media/* {
 		root * /srv/app
-		header Cache-Control "public, max-age=604800"
+		@exists file
+		header @exists Cache-Control "public, max-age=604800"
+		header ?Cache-Control "no-store"
 		file_server
 	}
 
@@ -56,5 +71,13 @@ meguaz.com {
 		header Cache-Control "no-cache"
 		try_files {path} /index.html
 		file_server
+	}
+
+	# Caddy-generated errors (file_server 404s) bypass the route's header
+	# ops, arriving at Cloudflare with no Cache-Control — which then applies
+	# its default 4h edge TTL. Errors must say no-store themselves.
+	handle_errors {
+		header Cache-Control "no-store"
+		respond "{err.status_code} {err.status_text}" {err.status_code}
 	}
 }

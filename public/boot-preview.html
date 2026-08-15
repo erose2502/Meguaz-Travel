@@ -1,59 +1,14 @@
 <!doctype html>
-<html lang="<!-- figma:lang -->">
+<html lang="en">
   <head>
-    <!-- figma:head-start -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title><!-- figma:title --></title>
-    <!-- figma:head-end -->
-    <!-- Tint the browser's own chrome (status bar, tab strip) to the page
-         ground so the app reads edge-to-edge instead of framed in white. -->
-    <meta name="theme-color" content="#f5ead8" />
-    <!-- Fonts load async (print→all swap): a slow fonts.googleapis.com must
-         never block first paint — text renders in fallbacks, then swaps. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap"
-      media="print"
-      onload="this.media='all'"
-    />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap"
-      />
-    </noscript>
-    <!-- The hero's poster paints the first frame while videos defer. -->
-    <link rel="preload" as="image" href="/media/plan-fjords.jpg" fetchpriority="high" />
-    <script>
-      // Self-heal for stale shells: if the app bundle 404s or arrives as the
-      // wrong type after a deploy rotated the hashes, pull a fresh shell once
-      // instead of leaving a blank page.
-      window.addEventListener(
-        'error',
-        function (e) {
-          var t = e.target
-          if (
-            t &&
-            t.tagName === 'SCRIPT' &&
-            t.src &&
-            t.src.indexOf('/assets/') !== -1 &&
-            !sessionStorage.getItem('mg-reloaded')
-          ) {
-            sessionStorage.setItem('mg-reloaded', '1')
-            location.reload()
-          }
-        },
-        true
-      )
-    </script>
+    <title>Boot screen preview — tap anywhere to shuffle</title>
   </head>
-  <body>
-    <!-- figma:body-start -->
-    <div id="root">
-      <style>
+  <body style="margin: 0">
+    <!-- Design-review copy of the index.html boot state, transplanted
+         verbatim. Tap/click anywhere to shuffle scene + fact. -->
+    <style>
         /* Boot state: replaced the instant React mounts. Self-contained so it
            paints before any stylesheet or font arrives; the fade-in delay
            keeps fast loads from ever flashing it. A random destination scene
@@ -63,7 +18,7 @@
           inset: 0;
           background: #10201f;
           opacity: 0;
-          animation: mg-boot-in 0.4s ease 0.15s forwards;
+          opacity: 1;
         }
         #mg-boot .bg {
           position: absolute;
@@ -170,7 +125,7 @@
           }
         }
       </style>
-      <div id="mg-boot" role="status" aria-label="Loading Meguaz">
+    <div id="mg-boot" role="status" aria-label="Loading Meguaz">
         <img class="bg" id="mg-boot-img" alt="" />
         <div class="veil"></div>
         <div class="top">
@@ -187,7 +142,8 @@
           <div class="features">✈ Real fares · 🧭 Door-to-gate plans · 🎧 Voice concierge</div>
         </div>
       </div>
-      <script>
+    <script>
+      window.__shuffle = function () {
         ;(function () {
           var scenes = {
             CDG: 'Paris', NRT: 'Tokyo', LIS: 'Lisbon', ATH: 'Athens', DXB: 'Dubai', FCO: 'Rome',
@@ -218,9 +174,9 @@
           var fact = document.getElementById('mg-boot-fact')
           if (fact) fact.textContent = facts[Math.floor(Math.random() * facts.length)]
         })()
-      </script>
-    </div>
-    <script type="module" src="/src/main.tsx"></script>
-    <!-- figma:body-end -->
+      }
+      window.__shuffle()
+      document.getElementById('mg-boot').addEventListener('click', window.__shuffle)
+    </script>
   </body>
 </html>

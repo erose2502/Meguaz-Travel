@@ -25,6 +25,8 @@ export default function MobileNav({ screen, onNavigate }: Props) {
         display: 'flex',
         justifyContent: 'center',
         padding: '0 16px 22px',
+        // Keep the pill above the iOS home indicator with viewport-fit=cover.
+        paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 8px))',
         pointerEvents: 'none',
       }}
     >

@@ -32,7 +32,10 @@ export default function Header({ screen, isWide, onNavigate, onConnectAgent, use
         position: 'sticky',
         top: 0,
         zIndex: 30,
+        // viewport-fit=cover lets the page under the notch; the header pads
+        // itself back out of the status bar.
         padding: 'clamp(10px,1.6vw,18px) clamp(14px,3vw,40px)',
+        paddingTop: 'calc(clamp(10px,1.6vw,18px) + env(safe-area-inset-top, 0px))',
         background: 'rgba(250,242,229,0.52)',
         backdropFilter: 'blur(34px) saturate(200%)',
         WebkitBackdropFilter: 'blur(34px) saturate(200%)',

@@ -27,8 +27,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     return (
       <div
         role="alert"
+        className="mg-viewport-fill"
         style={{
-          minHeight: '100vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
