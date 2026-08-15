@@ -621,6 +621,20 @@ export default function App({
           {screen === 'journey' && (
             <JourneyScreen
               transfer={transfer}
+              stay={
+                dest
+                  ? {
+                      location: dest.city,
+                      checkIn: arriveBy,
+                      checkOut: (() => {
+                        const d = new Date(arriveBy + 'T00:00:00')
+                        d.setDate(d.getDate() + nights)
+                        return d.toISOString().slice(0, 10)
+                      })(),
+                      adults,
+                    }
+                  : null
+              }
               option={selected}
               routeLabel={plan?.routeLabel ?? ''}
               budget={budget}

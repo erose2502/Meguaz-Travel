@@ -2,6 +2,8 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import Icon, { type IconName } from './Icon'
 import { searchAirports, weatherForecast, type PlanOption, type TransferMode, type Weather } from '../lib/api'
 import { uberRideLink } from '../lib/uber'
+import CustomSteps from './CustomSteps'
+import StaysPanel from './StaysPanel'
 import type { LiveLeaveBy } from '../lib/useTripPlan'
 
 type Props = {
@@ -13,6 +15,8 @@ type Props = {
   dest: { city: string; code: string } | null
   /** Chosen airport-transfer mode; rideshare legs get a one-tap Uber link. */
   transfer: TransferMode
+  /** Stay-search window for the live rentals/hotels panel. */
+  stay: { location: string; checkIn: string; checkOut: string; adults: number } | null
   goPlanner: () => void
   goLocked: () => void
 }
@@ -154,7 +158,7 @@ const STEP_ICON: Record<string, IconName> = {
   train: 'tram',
 }
 
-export default function JourneyScreen({ option, routeLabel, budget, live, dest, transfer, goPlanner, goLocked }: Props) {
+export default function JourneyScreen({ option, routeLabel, budget, live, dest, transfer, stay, goPlanner, goLocked }: Props) {
   // Departure-airport coordinates power the one-tap Uber deep link on the
   // rideshare leg. Resolved lazily from the airport index by exact IATA.
   const [uberDrop, setUberDrop] = useState<{ lat: number; lng: number; name: string } | null>(null)
@@ -627,6 +631,18 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
               Lock in this plan
             </button>
           </div>
+
+          {/* The plan is the single surface: the traveller's own additions and
+              real stay inventory live here, not in thirty other tabs. */}
+          <CustomSteps planKey={(dest?.code ?? 'trip') + ':' + option.departAt} />
+          {stay && (
+            <StaysPanel
+              location={stay.location}
+              checkIn={stay.checkIn}
+              checkOut={stay.checkOut}
+              adults={stay.adults}
+            />
+          )}
         </div>
       </div>
     </div>

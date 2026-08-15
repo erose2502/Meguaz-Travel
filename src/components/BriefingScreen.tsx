@@ -491,6 +491,26 @@ export default function BriefingScreen({
                       {spot.note}
                     </p>
                   )}
+                  <a
+                    href={'https://www.ubereats.com/search?q=' + encodeURIComponent(spot.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginTop: 10,
+                      padding: '6px 12px',
+                      borderRadius: 999,
+                      background: '#000',
+                      color: '#fff',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Order on Uber Eats
+                  </a>
                 </div>
               ))}
             </div>
