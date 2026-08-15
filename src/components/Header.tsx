@@ -64,9 +64,9 @@ export default function Header({ screen, isWide, onNavigate, user, avatarUrl, on
           <img
             src="/android-chrome-192x192.png"
             alt=""
-            width={30}
-            height={30}
-            style={{ display: 'block' }}
+            width={42}
+            height={42}
+            style={{ display: 'block', margin: '-6px 0' }}
           />
           Meguaz
         </span>
