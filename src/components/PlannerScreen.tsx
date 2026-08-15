@@ -4,7 +4,8 @@ import Icon, { type IconName } from './Icon'
 import Spinner, { Skeleton } from './Spinner'
 import DatePicker from './DatePicker'
 import GlassSelect from './GlassSelect'
-import type { DepartWindow, PlanOption, SolveResponse } from '../lib/api'
+import AirportPicker from './AirportPicker'
+import type { DepartWindow, NearbyAirport, PlanOption, SolveResponse, StayPreference } from '../lib/api'
 import type { Priority } from '../types'
 
 type Props = {
@@ -27,6 +28,13 @@ type Props = {
   onBudget: (budget: number) => void
   departWindow: DepartWindow
   onDepartWindow: (w: DepartWindow) => void
+  stayPref: StayPreference
+  onStayPref: (p: StayPreference) => void
+  airports: NearbyAirport[]
+  originIata: string | null
+  onOriginIata: (iata: string) => void
+  originCoords: { lat: number; lng: number } | null
+  originLocating: boolean
   onSelect: (option: PlanOption) => void
   goHome: () => void
 }
@@ -190,6 +198,13 @@ export default function PlannerScreen(props: Props) {
     onBudget,
     departWindow,
     onDepartWindow,
+    stayPref,
+    onStayPref,
+    airports,
+    originIata,
+    onOriginIata,
+    originCoords,
+    originLocating,
     onSelect,
     goHome,
   } = props
@@ -322,7 +337,15 @@ export default function PlannerScreen(props: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div>
             <p style={MICRO}>From</p>
-            <p style={{ fontSize: 14, fontWeight: 700, margin: '2px 0 0' }}>{plan?.brief.from ?? '—'}</p>
+            <div style={{ marginTop: 3 }}>
+              <AirportPicker
+                nearby={airports}
+                value={originIata}
+                onChange={onOriginIata}
+                coords={originCoords}
+                locating={originLocating}
+              />
+            </div>
           </div>
           <Icon name="arrowRight" size={15} color="var(--color-accent)" style={{ flex: 'none' }} />
           <div>
@@ -372,13 +395,26 @@ export default function PlannerScreen(props: Props) {
             />
           </div>
         </div>
-        {stay && (
-          <BriefItem
-            icon="home"
-            label={'Stay est. (' + stay.kind + ')'}
-            value={'~$' + stay.nightlyUsd + '/night · $' + stay.totalUsd + ' total'}
-          />
-        )}
+        <div>
+          <p style={MICRO}>Stay style</p>
+          <div style={{ marginTop: 3 }}>
+            <GlassSelect
+              ariaLabel="Stay style"
+              variant="chip"
+              value={stayPref}
+              onChange={onStayPref}
+              options={[
+                { value: 'home', label: 'Homes' },
+                { value: 'resort', label: 'Hotels & resorts' },
+              ]}
+            />
+          </div>
+          {stay && (
+            <p style={{ fontSize: 10.5, color: 'var(--color-neutral-600)', margin: '3px 0 0' }}>
+              ~${stay.nightlyUsd}/night · ${stay.totalUsd} total
+            </p>
+          )}
+        </div>
 
         {/* Grows to fill its row — pinned right it left a dead hole when the
             control count pushed it onto a second line. */}
@@ -490,7 +526,8 @@ export default function PlannerScreen(props: Props) {
       >
         {options.map((route) => {
           const chosen = route.fits === wanted
-          const under = budget - route.cost
+          // Budget verdict counts the whole trip — the stay estimate included.
+          const under = budget - route.cost - (stay?.totalUsd ?? 0)
           // The airport→city leg the solver actually priced, plus the live
           // alternatives it found (FlixBus, rail, local operators).
           const transit = route.steps.find((s) => s.id === 'rail') ?? null
@@ -583,7 +620,8 @@ export default function PlannerScreen(props: Props) {
                       margin: '3px 0 0',
                     }}
                   >
-                    {under >= 0 ? '$' + under + ' under budget' : '$' + Math.abs(under) + ' over budget'}
+                    {(under >= 0 ? '$' + under + ' under budget' : '$' + Math.abs(under) + ' over budget') +
+                      (stay ? ' incl. stay' : '')}
                   </p>
                   {stay && (
                     <p style={{ fontSize: 11, color: 'var(--color-neutral-600)', margin: '3px 0 0' }}>

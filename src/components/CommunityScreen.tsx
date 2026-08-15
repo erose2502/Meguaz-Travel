@@ -3,11 +3,13 @@ import Icon from './Icon'
 import Spinner from './Spinner'
 import { img } from '../data/media'
 import {
+  destinationGuideFor,
   searchCommunity,
   setFollowing,
   submitReview,
   type CommunityFeedItem,
   type CommunityUser,
+  type DestinationGuide,
   type SessionUser,
 } from '../lib/api'
 import { DESTINATIONS, type Destination } from '../data/destinations'
@@ -18,6 +20,189 @@ import { shareJournalCard } from '../lib/shareCard'
 type Props = {
   user: SessionUser | null
   goAccount: () => void
+  /** Drops the reader into the planner with this destination prefilled. */
+  onPlan: (code: string) => void
+}
+
+// ── Travel intel: the feed is alive on day zero. Listicle cards built from
+//    the destination-guide pipeline (server-cached per city per month), each
+//    with one-tap hops to Shorts/TikTok for the video itch. ──────────────────
+
+const INTEL_CODES = ['LHR', 'CDG', 'NRT', 'FCO', 'IST', 'MEX']
+const INTEL_CACHE: Record<string, DestinationGuide> = {}
+
+function IntelCard({ code, onPlan }: { code: string; onPlan: (code: string) => void }) {
+  const dest = DESTINATIONS.find((d) => d.code === code)
+  const [guide, setGuide] = useState<DestinationGuide | null>(INTEL_CACHE[code] ?? null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    if (!dest || INTEL_CACHE[code]) return
+    const controller = new AbortController()
+    destinationGuideFor(dest.city, dest.country, controller.signal)
+      .then((g) => {
+        INTEL_CACHE[code] = g
+        setGuide(g)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true)
+      })
+    return () => controller.abort()
+  }, [code, dest])
+
+  if (!dest || failed) return null
+  const scene = img(sceneUrls(code)[0] ?? '')
+  const things = guide?.attractions.slice(0, 6) ?? []
+  const fact = guide?.facts[0] ?? null
+
+  return (
+    <article className="glass" style={{ borderRadius: 22, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', height: 150 }}>
+        {scene && (
+          <img
+            src={scene}
+            alt=""
+            loading="lazy"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        )}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(rgba(12,20,20,0.05) 40%, rgba(12,20,20,0.62))',
+          }}
+        />
+        <p
+          style={{
+            position: 'absolute',
+            left: 16,
+            bottom: 12,
+            margin: 0,
+            fontFamily: 'var(--font-heading)',
+            fontSize: 21,
+            color: '#fff',
+            textShadow: '0 2px 12px rgba(0,0,0,0.4)',
+          }}
+        >
+          {things.length > 0 ? things.length + ' things to do in ' + dest.city : dest.city}
+        </p>
+      </div>
+      <div style={{ padding: '12px 16px 16px' }}>
+        {guide === null ? (
+          <div
+            style={{
+              height: 120,
+              borderRadius: 12,
+              background:
+                'linear-gradient(100deg, var(--color-neutral-200) 40%, var(--color-neutral-100) 50%, var(--color-neutral-200) 60%)',
+              backgroundSize: '300% 100%',
+              animation: 'mg-shimmer 1.4s linear infinite',
+            }}
+          />
+        ) : (
+          <>
+            <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 7 }}>
+              {things.map((a, i) => (
+                <li key={a.name} style={{ display: 'flex', gap: 9, fontSize: 12.5, lineHeight: 1.45 }}>
+                  <span
+                    style={{
+                      flex: 'none',
+                      width: 19,
+                      height: 19,
+                      borderRadius: 999,
+                      background: 'var(--color-accent-100)',
+                      color: 'var(--color-accent-800)',
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: 1,
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span>
+                    <strong>{a.name}</strong>
+                    <span style={{ color: 'var(--color-neutral-600)' }}> — {a.why}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+            {fact && (
+              <p
+                style={{
+                  margin: '10px 0 0',
+                  padding: '8px 11px',
+                  borderRadius: 12,
+                  background: 'var(--color-accent-2-100)',
+                  color: 'var(--color-accent-2-800)',
+                  fontSize: 11.5,
+                  lineHeight: 1.5,
+                }}
+              >
+                ✦ {fact}
+              </p>
+            )}
+          </>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
+          <button
+            className="hv-accent"
+            onClick={() => onPlan(dest.code)}
+            style={{
+              border: 0,
+              borderRadius: 999,
+              padding: '8px 16px',
+              background: 'var(--color-accent)',
+              color: 'var(--color-bg)',
+              fontFamily: 'var(--font-heading)',
+              fontSize: 12.5,
+              cursor: 'pointer',
+            }}
+          >
+            Plan {dest.city}
+          </button>
+          <a
+            href={'https://www.youtube.com/results?search_query=' + encodeURIComponent(dest.city + ' travel shorts')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hv-white"
+            style={{ border: '1px solid var(--color-divider)', borderRadius: 999, padding: '8px 14px', fontSize: 11.5, fontWeight: 700, color: 'var(--color-text)', textDecoration: 'none' }}
+          >
+            ▶ Shorts
+          </a>
+          <a
+            href={'https://www.tiktok.com/search?q=' + encodeURIComponent(dest.city + ' travel')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hv-white"
+            style={{ border: '1px solid var(--color-divider)', borderRadius: 999, padding: '8px 14px', fontSize: 11.5, fontWeight: 700, color: 'var(--color-text)', textDecoration: 'none' }}
+          >
+            ♪ TikTok
+          </a>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function TravelIntel({ onPlan }: { onPlan: (code: string) => void }) {
+  return (
+    <section style={{ marginTop: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, margin: '0 0 10px' }}>
+        <h2 style={{ fontSize: 17, margin: 0 }}>Travel intel</h2>
+        <span style={{ fontSize: 11.5, color: 'var(--color-neutral-600)' }}>
+          fresh guides while the community grows
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 12 }}>
+        {INTEL_CODES.map((code) => (
+          <IntelCard key={code} code={code} onPlan={onPlan} />
+        ))}
+      </div>
+    </section>
+  )
 }
 
 function Avatar({ name, url, size = 44 }: { name: string; url: string | null; size?: number }) {
@@ -411,7 +596,7 @@ function FollowButton({ u, onToggle }: { u: CommunityUser; onToggle: (u: Communi
   )
 }
 
-export default function CommunityScreen({ user, goAccount }: Props) {
+export default function CommunityScreen({ user, goAccount, onPlan }: Props) {
   const [query, setQuery] = useState('')
   const [users, setUsers] = useState<CommunityUser[]>([])
   const [discover, setDiscover] = useState<CommunityUser[]>([])
@@ -461,9 +646,11 @@ export default function CommunityScreen({ user, goAccount }: Props) {
   }
 
   if (!user) {
+    // Signed out, the tab still breathes: travel intel is public. Only the
+    // people features (follow, journal) wait behind the account.
     return (
-      <div data-screen-label="Community" style={{ maxWidth: 480, margin: '0 auto' }}>
-        <div className="glass" style={{ borderRadius: 22, padding: 24, textAlign: 'center' }}>
+      <div data-screen-label="Community" style={{ maxWidth: 980, margin: '0 auto' }}>
+        <div className="glass" style={{ borderRadius: 22, padding: 24, textAlign: 'center', maxWidth: 480, margin: '0 auto' }}>
           <span
             className="glass-accent"
             style={{
@@ -506,6 +693,7 @@ export default function CommunityScreen({ user, goAccount }: Props) {
             Sign in or create an account
           </button>
         </div>
+        <TravelIntel onPlan={onPlan} />
       </div>
     )
   }
@@ -623,6 +811,8 @@ export default function CommunityScreen({ user, goAccount }: Props) {
             user={user}
             onPosted={(item) => setFeed((prev) => [item, ...prev])}
           />
+
+          <TravelIntel onPlan={onPlan} />
 
           {/* The pulse: latest reviews as destination postcards */}
           <section>

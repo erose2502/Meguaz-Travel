@@ -61,8 +61,10 @@ export default function Header({ screen, isWide, onNavigate, user, avatarUrl, on
           Meguaz
         </span>
 
+        {/* Centered between wordmark and account — hugging the wordmark left
+            a dead field across the middle of the bar. */}
         {isWide && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 auto' }}>
             {TABS.map((tab) => {
               const on = screen === tab.id
               return (
@@ -91,7 +93,7 @@ export default function Header({ screen, isWide, onNavigate, user, avatarUrl, on
           </div>
         )}
 
-        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ marginLeft: isWide ? 0 : 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
           {user ? (
             <button
               onClick={onAccount}

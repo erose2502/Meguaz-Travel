@@ -92,6 +92,7 @@ export default function ProfileScreen(props: Props) {
   const [homeAirport, setHomeAirport] = useState<string | null>(null)
   const [style, setStyle] = useState<'saver' | 'balanced' | 'comfort'>('balanced')
   const [cabin, setCabin] = useState<CabinClass>('economy')
+  const [language, setLanguage] = useState<string>('English')
   const [budget, setBudget] = useState<number>(900)
   const [buffer, setBuffer] = useState<number>(90)
   const [saving, setSaving] = useState(false)
@@ -103,6 +104,7 @@ export default function ProfileScreen(props: Props) {
     setHomeAirport(profile.home_airport)
     if (profile.travel_style) setStyle(profile.travel_style)
     if (profile.preferred_cabin) setCabin(profile.preferred_cabin)
+    if (profile.preferred_language) setLanguage(profile.preferred_language)
     if (profile.default_budget_usd != null) setBudget(Number(profile.default_budget_usd))
     if (profile.airport_buffer_min != null) setBuffer(Number(profile.airport_buffer_min))
   }, [profile])
@@ -118,6 +120,7 @@ export default function ProfileScreen(props: Props) {
         preferredCabin: cabin,
         defaultBudgetUsd: budget,
         airportBufferMin: buffer,
+        preferredLanguage: language,
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 2400)
@@ -325,6 +328,31 @@ export default function ProfileScreen(props: Props) {
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ flex: '1 1 150px' }}>
+                  <label style={LABEL} htmlFor="mg-pref-language">
+                    Your language
+                  </label>
+                  <GlassSelect
+                    id="mg-pref-language"
+                    ariaLabel="Your language"
+                    value={language}
+                    onChange={setLanguage}
+                    options={[
+                      'English',
+                      'Amharic',
+                      'Arabic',
+                      'French',
+                      'German',
+                      'Hindi',
+                      'Italian',
+                      'Japanese',
+                      'Mandarin',
+                      'Portuguese',
+                      'Spanish',
+                      'Swahili',
+                    ].map((l) => ({ value: l, label: l }))}
+                  />
+                </div>
                 <div style={{ flex: '1 1 150px' }}>
                   <label style={LABEL} htmlFor="mg-pref-cabin">
                     Preferred cabin

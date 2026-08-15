@@ -34,6 +34,8 @@ export type TripBrief = {
   checkedBag?: boolean;
   /** Departure-time window for the outbound leg; "any" (default) skips it. */
   departWindow?: "any" | "morning" | "afternoon" | "evening";
+  /** Stay style for the estimate folded into trip totals. */
+  stayPreference?: "home" | "resort";
   // When present, the solver uses a real drive ETA from here to the departure
   // airport instead of a static estimate, sharpening "leave home by".
   originCoords?: { lat: number; lng: number };

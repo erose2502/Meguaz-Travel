@@ -65,6 +65,8 @@ export type TripBrief = {
   checkedBag?: boolean
   /** Departure-time window for the outbound leg; 'any' skips the filter. */
   departWindow?: DepartWindow
+  /** Stay style for the estimate folded into trip totals. */
+  stayPreference?: StayPreference
   originCoords?: { lat: number; lng: number }
 }
 
@@ -293,6 +295,7 @@ export type Profile = {
   preferred_cabin: CabinClass | null
   default_budget_usd: number | null
   airport_buffer_min: number | null
+  preferred_language: string | null
 }
 
 export type Preferences = {
@@ -302,6 +305,7 @@ export type Preferences = {
   preferredCabin?: CabinClass | null
   defaultBudgetUsd?: number | null
   airportBufferMin?: number | null
+  preferredLanguage?: string | null
 }
 
 export async function getSession(signal?: AbortSignal) {

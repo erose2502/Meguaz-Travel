@@ -15,6 +15,7 @@ const preferences = z.object({
   preferredCabin: z.enum(["economy", "premium_economy", "business", "first"]).nullish(),
   defaultBudgetUsd: z.number().min(50).max(100000).nullish(),
   airportBufferMin: z.number().int().min(0).max(600).nullish(),
+  preferredLanguage: z.string().max(40).nullish(),
 });
 
 // Columns added by migration 0003. Until it is applied the write is retried
@@ -23,6 +24,7 @@ const OPTIONAL_COLUMNS = [
   "preferred_cabin",
   "default_budget_usd",
   "airport_buffer_min",
+  "preferred_language",
   "updated_at",
 ] as const;
 
@@ -36,6 +38,7 @@ function toRow(input: z.infer<typeof preferences>) {
   if (input.preferredCabin !== undefined) row.preferred_cabin = input.preferredCabin;
   if (input.defaultBudgetUsd !== undefined) row.default_budget_usd = input.defaultBudgetUsd;
   if (input.airportBufferMin !== undefined) row.airport_buffer_min = input.airportBufferMin;
+  if (input.preferredLanguage !== undefined) row.preferred_language = input.preferredLanguage;
   row.updated_at = new Date().toISOString();
   return row;
 }

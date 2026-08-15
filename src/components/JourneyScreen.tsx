@@ -20,6 +20,8 @@ type Props = {
   stay: { location: string; checkIn: string; checkOut: string; adults: number } | null
   /** Recreates this exact brief when opened — the invite and the backup. */
   shareUrl: string | null
+  /** Median stay estimate for the window; folded into the budget verdict. */
+  stayTotal: number | null
   goPlanner: () => void
   goLocked: () => void
 }
@@ -162,7 +164,7 @@ const STEP_ICON: Record<string, IconName> = {
   train: 'tram',
 }
 
-export default function JourneyScreen({ option, routeLabel, budget, live, dest, transfer, stay, shareUrl, goPlanner, goLocked }: Props) {
+export default function JourneyScreen({ option, routeLabel, budget, live, dest, transfer, stay, shareUrl, stayTotal, goPlanner, goLocked }: Props) {
   const [shared, setShared] = useState<'invite' | 'export' | null>(null)
 
   const invite = async () => {
@@ -252,7 +254,11 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
     )
   }
 
-  const under = budget - option.cost
+  // The budget verdict counts the WHOLE trip — flights, transfers, and the
+  // stay estimate. A plan that fits only if you sleep outside isn't a plan.
+  const tripTotal = option.cost + (stayTotal ?? 0)
+  const under = budget - tripTotal
+  const overBudget = under < 0
   const total = option.costBreakdown.reduce((sum, line) => sum + line.amount, 0) || option.cost
 
   return (
@@ -685,9 +691,8 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
             </button>
           </div>
 
-          {/* The plan is the single surface: the traveller's own additions and
-              real stay inventory live here, not in thirty other tabs. */}
-          <CustomSteps planKey={(dest?.code ?? 'trip') + ':' + option.departAt} />
+          {/* The plan is the single surface: real stay inventory first (the
+              biggest open decision), then the traveller's own additions. */}
           {stay && (
             <StaysPanel
               location={stay.location}
@@ -696,6 +701,7 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
               adults={stay.adults}
             />
           )}
+          <CustomSteps planKey={(dest?.code ?? 'trip') + ':' + option.departAt} />
 
           {/* The final word: everything above is the trip; this is the button
               that makes it real. Last on purpose. */}
@@ -711,17 +717,24 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
               padding: 14,
             }}
           >
-            <div style={{ flex: '1 1 120px' }}>
-              <p style={{ fontSize: 11, color: 'var(--color-neutral-600)', margin: 0 }}>
-                Total · {under >= 0 ? '$' + under + ' under budget' : '$' + Math.abs(under) + ' over'}
+            <div style={{ flex: '1 1 150px' }}>
+              <p style={{ fontSize: 11, color: overBudget ? 'var(--color-accent-800)' : 'var(--color-neutral-600)', margin: 0, fontWeight: overBudget ? 700 : 400 }}>
+                {stayTotal != null ? 'Trip total incl. stay est. · ' : 'Total · '}
+                {under >= 0 ? '$' + under + ' under budget' : '$' + Math.abs(under) + ' over budget'}
               </p>
               <p style={{ fontFamily: 'var(--font-heading)', fontSize: 24, lineHeight: 1, margin: '3px 0 0' }}>
-                ${option.cost}
+                ${tripTotal}
+                {stayTotal != null && (
+                  <span style={{ fontSize: 12, fontFamily: 'var(--font-body)', color: 'var(--color-neutral-600)', fontWeight: 600 }}>
+                    {' '}(${option.cost} travel + ${stayTotal} stay)
+                  </span>
+                )}
               </p>
             </div>
             <button
-              className="hv-accent"
-              onClick={goLocked}
+              className={overBudget ? undefined : 'hv-accent'}
+              onClick={overBudget ? undefined : goLocked}
+              disabled={overBudget}
               style={{
                 flex: '1 1 200px',
                 display: 'flex',
@@ -731,16 +744,22 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
                 padding: '14px 20px',
                 border: 0,
                 borderRadius: 999,
-                background: 'var(--color-accent)',
-                color: 'var(--color-bg)',
+                background: overBudget ? 'var(--color-neutral-300)' : 'var(--color-accent)',
+                color: overBudget ? 'var(--color-neutral-600)' : 'var(--color-bg)',
                 fontFamily: 'var(--font-heading)',
                 fontSize: 14,
-                cursor: 'pointer',
+                cursor: overBudget ? 'not-allowed' : 'pointer',
               }}
             >
               <Icon name="lock" size={15} />
-              Lock in this plan
+              {overBudget ? 'Over budget — adjust the trip' : 'Lock in this plan'}
             </button>
+            {overBudget && (
+              <p style={{ flexBasis: '100%', fontSize: 12, lineHeight: 1.5, color: 'var(--color-accent-800)', margin: '2px 0 0' }}>
+                This plan runs ${Math.abs(under)} past your ${budget} cap with the stay counted.
+                Raise the budget, trim nights, or pick a cheaper route or stay — the plan updates live.
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -33,6 +33,7 @@ import {
   type BookingResult,
   type CabinClass,
   type DepartWindow,
+  type StayPreference,
   type DestinationGuide,
   type PlanOption,
   type TransferMode,
@@ -158,6 +159,7 @@ export default function App({
   const [transfer, setTransfer] = useState<TransferMode>('rideshare')
   const [checkedBag, setCheckedBag] = useState(false)
   const [departWindow, setDepartWindow] = useState<DepartWindow>('any')
+  const [stayPref, setStayPref] = useState<StayPreference>('home')
   const [originIata, setOriginIata] = useState<string | null>(null)
   const account = useAccount()
   const tripsState = useTrips(!!account.user)
@@ -305,6 +307,7 @@ export default function App({
     cabinClass,
     checkedBag,
     departWindow,
+    stayPreference: stayPref,
     ...(home.coords && departureIsNearby ? { originCoords: home.coords } : {}),
   }
   const { plan, loading, refreshing, error, lastUpdated, refresh } = useTripPlan(brief, planActive)
@@ -623,6 +626,13 @@ export default function App({
               onBudget={setBudget}
               departWindow={departWindow}
               onDepartWindow={setDepartWindow}
+              stayPref={stayPref}
+              onStayPref={setStayPref}
+              airports={home.airports}
+              originIata={originIata}
+              onOriginIata={setOriginIata}
+              originCoords={home.coords}
+              originLocating={home.status === 'locating'}
               onSelect={(option) => {
                 setSelected(option)
                 go('journey')()
@@ -634,6 +644,7 @@ export default function App({
           {screen === 'journey' && (
             <JourneyScreen
               transfer={transfer}
+              stayTotal={plan?.stay?.totalUsd ?? null}
               shareUrl={
                 dest
                   ? window.location.origin +
@@ -721,7 +732,7 @@ export default function App({
           )}
 
           {screen === 'community' && (
-            <CommunityScreen user={account.user} goAccount={go('account')} />
+            <CommunityScreen user={account.user} goAccount={go('account')} onPlan={pickPlan} />
           )}
 
           {screen === 'onboarding' && (

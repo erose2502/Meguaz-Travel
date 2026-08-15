@@ -99,7 +99,7 @@ export async function solveTrip(brief: TripBrief): Promise<SolveResponse | null>
   // in parallel with the flights and never allowed to fail the solve.
   const staysPromise: Promise<StaysSearchResult | null> = returnDate
     ? searchStays({
-        preference: "home",
+        preference: brief.stayPreference ?? "home",
         location: title(brief.to),
         checkIn: brief.arriveBy,
         checkOut: returnDate,
