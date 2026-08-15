@@ -11,6 +11,14 @@ type Props = {
 
 const CACHE: Record<string, StaysResponse> = {}
 
+/** "2026-11-27" reads like a database; "November 27, 2026" reads like a trip. */
+export function prettyDate(iso: string) {
+  const d = new Date(iso + 'T00:00:00')
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
 /**
  * Real stay inventory inside the plan — Airbnb rentals via SearchApi's Airbnb
  * engine, resorts/hotels via the same stays route. Booking finishes on the
@@ -75,7 +83,7 @@ export default function StaysPanel({ location, checkIn, checkOut, adults }: Prop
         </div>
       </div>
       <p style={{ fontSize: 11.5, color: 'var(--color-neutral-600)', margin: '0 0 12px' }}>
-        {checkIn} → {checkOut} · {adults} {adults === 1 ? 'guest' : 'guests'} · live prices
+        {prettyDate(checkIn)} → {prettyDate(checkOut)} · {adults} {adults === 1 ? 'guest' : 'guests'} · live prices
         {stays && !stays.bookableInApp ? ' · booking finishes on ' + (stays.kind === 'airbnb' ? 'Airbnb' : 'the property site') : ''}
       </p>
 

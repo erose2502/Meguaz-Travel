@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
 import Spinner from './Spinner'
-import { img } from '../data/media'
+import { DEST_HERO_CLIPS, img } from '../data/media'
 import {
   destinationGuideFor,
   searchCommunity,
@@ -31,6 +31,8 @@ type Props = {
 const INTEL_CODES = ['LHR', 'CDG', 'NRT', 'FCO', 'IST', 'MEX']
 const INTEL_CACHE: Record<string, DestinationGuide> = {}
 
+const SMALL = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches
+
 function IntelCard({ code, onPlan }: { code: string; onPlan: (code: string) => void }) {
   const dest = DESTINATIONS.find((d) => d.code === code)
   const [guide, setGuide] = useState<DestinationGuide | null>(INTEL_CACHE[code] ?? null)
@@ -50,115 +52,144 @@ function IntelCard({ code, onPlan }: { code: string; onPlan: (code: string) => v
   }, [code, dest])
 
   if (!dest || failed) return null
+  // Reels energy without a third-party player: our own cinematic clip runs
+  // under the overlay on desktop; phones get the still (bandwidth rules).
+  const clip = !SMALL ? (DEST_HERO_CLIPS[code] ?? null) : null
   const scene = img(sceneUrls(code)[0] ?? '')
-  const things = guide?.attractions.slice(0, 6) ?? []
-  const fact = guide?.facts[0] ?? null
+  const things = guide?.attractions.slice(0, 4) ?? []
+
+  const pill: React.CSSProperties = {
+    border: '1px solid rgba(255,255,255,0.45)',
+    borderRadius: 999,
+    padding: '8px 14px',
+    fontSize: 11.5,
+    fontWeight: 700,
+    color: '#fff',
+    textDecoration: 'none',
+    background: 'rgba(255,255,255,0.14)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+  }
 
   return (
-    <article className="glass" style={{ borderRadius: 22, overflow: 'hidden' }}>
-      <div style={{ position: 'relative', height: 150 }}>
-        {scene && (
+    <article
+      style={{
+        position: 'relative',
+        borderRadius: 22,
+        overflow: 'hidden',
+        minHeight: 460,
+        display: 'flex',
+        alignItems: 'flex-end',
+        background: 'linear-gradient(160deg, #14343a, #0c2023)',
+      }}
+    >
+      {clip ? (
+        <video
+          src={clip}
+          autoPlay
+          muted
+          loop
+          playsInline
+          poster={scene || undefined}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+      ) : (
+        scene && (
           <img
             src={scene}
             alt=""
             loading="lazy"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
           />
-        )}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(rgba(12,20,20,0.05) 40%, rgba(12,20,20,0.62))',
-          }}
-        />
+        )
+      )}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(rgba(10,16,16,0.08) 22%, rgba(10,16,16,0.46) 52%, rgba(8,14,14,0.88))',
+        }}
+      />
+
+      <div style={{ position: 'relative', padding: '16px 16px 16px', width: '100%', color: '#fff' }}>
         <p
           style={{
-            position: 'absolute',
-            left: 16,
-            bottom: 12,
             margin: 0,
+            fontSize: 10,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.75)',
+          }}
+        >
+          {dest.country}
+        </p>
+        <p
+          style={{
+            margin: '3px 0 10px',
             fontFamily: 'var(--font-heading)',
-            fontSize: 21,
-            color: '#fff',
-            textShadow: '0 2px 12px rgba(0,0,0,0.4)',
+            fontSize: 22,
+            lineHeight: 1.12,
+            textShadow: '0 2px 14px rgba(0,0,0,0.45)',
           }}
         >
           {things.length > 0 ? things.length + ' things to do in ' + dest.city : dest.city}
         </p>
-      </div>
-      <div style={{ padding: '12px 16px 16px' }}>
+
         {guide === null ? (
           <div
             style={{
-              height: 120,
+              height: 84,
               borderRadius: 12,
-              background:
-                'linear-gradient(100deg, var(--color-neutral-200) 40%, var(--color-neutral-100) 50%, var(--color-neutral-200) 60%)',
-              backgroundSize: '300% 100%',
+              background: 'rgba(255,255,255,0.14)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
               animation: 'mg-shimmer 1.4s linear infinite',
             }}
           />
         ) : (
-          <>
-            <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 7 }}>
-              {things.map((a, i) => (
-                <li key={a.name} style={{ display: 'flex', gap: 9, fontSize: 12.5, lineHeight: 1.45 }}>
-                  <span
-                    style={{
-                      flex: 'none',
-                      width: 19,
-                      height: 19,
-                      borderRadius: 999,
-                      background: 'var(--color-accent-100)',
-                      color: 'var(--color-accent-800)',
-                      fontSize: 10.5,
-                      fontWeight: 800,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginTop: 1,
-                    }}
-                  >
-                    {i + 1}
-                  </span>
-                  <span>
-                    <strong>{a.name}</strong>
-                    <span style={{ color: 'var(--color-neutral-600)' }}> — {a.why}</span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-            {fact && (
-              <p
-                style={{
-                  margin: '10px 0 0',
-                  padding: '8px 11px',
-                  borderRadius: 12,
-                  background: 'var(--color-accent-2-100)',
-                  color: 'var(--color-accent-2-800)',
-                  fontSize: 11.5,
-                  lineHeight: 1.5,
-                }}
-              >
-                ✦ {fact}
-              </p>
-            )}
-          </>
+          <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 6 }}>
+            {things.map((a, i) => (
+              <li key={a.name} style={{ display: 'flex', gap: 8, fontSize: 12.5, lineHeight: 1.4 }}>
+                <span
+                  style={{
+                    flex: 'none',
+                    width: 18,
+                    height: 18,
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.22)',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 1,
+                  }}
+                >
+                  {i + 1}
+                </span>
+                <span style={{ textShadow: '0 1px 8px rgba(0,0,0,0.5)' }}>
+                  <strong>{a.name}</strong>
+                  <span style={{ color: 'rgba(255,255,255,0.78)' }}> — {a.why}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
         )}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 14 }}>
           <button
             className="hv-accent"
             onClick={() => onPlan(dest.code)}
             style={{
               border: 0,
               borderRadius: 999,
-              padding: '8px 16px',
+              padding: '9px 18px',
               background: 'var(--color-accent)',
               color: 'var(--color-bg)',
               fontFamily: 'var(--font-heading)',
-              fontSize: 12.5,
+              fontSize: 13,
               cursor: 'pointer',
+              boxShadow: '0 8px 20px -8px rgba(0,0,0,0.6)',
             }}
           >
             Plan {dest.city}
@@ -167,8 +198,7 @@ function IntelCard({ code, onPlan }: { code: string; onPlan: (code: string) => v
             href={'https://www.youtube.com/results?search_query=' + encodeURIComponent(dest.city + ' travel shorts')}
             target="_blank"
             rel="noopener noreferrer"
-            className="hv-white"
-            style={{ border: '1px solid var(--color-divider)', borderRadius: 999, padding: '8px 14px', fontSize: 11.5, fontWeight: 700, color: 'var(--color-text)', textDecoration: 'none' }}
+            style={pill}
           >
             ▶ Shorts
           </a>
@@ -176,8 +206,7 @@ function IntelCard({ code, onPlan }: { code: string; onPlan: (code: string) => v
             href={'https://www.tiktok.com/search?q=' + encodeURIComponent(dest.city + ' travel')}
             target="_blank"
             rel="noopener noreferrer"
-            className="hv-white"
-            style={{ border: '1px solid var(--color-divider)', borderRadius: 999, padding: '8px 14px', fontSize: 11.5, fontWeight: 700, color: 'var(--color-text)', textDecoration: 'none' }}
+            style={pill}
           >
             ♪ TikTok
           </a>

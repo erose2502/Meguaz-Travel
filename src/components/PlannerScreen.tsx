@@ -367,7 +367,12 @@ export default function PlannerScreen(props: Props) {
           <p style={MICRO}>Nights</p>
           <MiniCount value={nights} min={1} max={90} onChange={onNights} label="Nights" />
           <p style={{ fontSize: 10.5, color: 'var(--color-neutral-600)', margin: '3px 0 0' }}>
-            back {returnBy}
+            back {(() => {
+              const d = new Date(returnBy + 'T00:00:00')
+              return Number.isNaN(d.getTime())
+                ? returnBy
+                : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+            })()}
           </p>
         </div>
 

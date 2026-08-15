@@ -521,7 +521,7 @@ export function buildOption(
 }
 
 function hm(d: Date) {
-  return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 function addMin(d: Date, min: number) {
   return new Date(d.getTime() + min * 60_000);
