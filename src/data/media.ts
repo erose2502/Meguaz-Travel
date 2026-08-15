@@ -17,6 +17,15 @@ export const HERO_REEL: HeroSlide[] = [
   { src: '/media/default-dunes.mp4', alt: 'Desert dunes rippling at sunset', video: true },
 ]
 
+/** Photo counterparts for phones and data-saver connections. The video reel
+    costs megabytes before the traveller has done anything; these stills give
+    the same mood for ~200KB apiece, and the crossfade still breathes. */
+export const HERO_REEL_LITE: HeroSlide[] = [
+  { src: '/media/scenes/CDG-1.jpg', alt: 'Evening light over Paris rooftops' },
+  { src: '/media/scenes/NRT-1.jpg', alt: 'Neon-lit street in Tokyo' },
+  { src: '/media/scenes/ATH-1.jpg', alt: 'Aegean coast at golden hour' },
+]
+
 /** Cinematic clip that takes over the hero when one of these is the destination. */
 export const DEST_HERO_CLIPS: Record<string, string> = {
   NRT: '/media/dest-nrt.mp4',

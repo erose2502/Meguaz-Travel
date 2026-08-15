@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { HERO_REEL, type HeroSlide } from '../data/media'
+import { HERO_REEL, HERO_REEL_LITE, type HeroSlide } from '../data/media'
 
 type Props = {
   /** Destination stills; take over the reel once a destination is chosen. */
@@ -18,21 +18,34 @@ function prefersReducedMotion() {
   )
 }
 
+/** Phones and data-saver connections get the photo reel — the videos are
+    megabytes each and were measured strangling first load on mobile. */
+function liteMedia() {
+  if (typeof window === 'undefined') return false
+  if (window.matchMedia?.('(max-width: 767px)').matches) return true
+  const conn = (navigator as { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+  return conn?.saveData === true || conn?.effectiveType === '2g' || conn?.effectiveType === '3g'
+}
+
 /**
  * The app's living background: the cinematic reel fills the whole viewport,
  * fixed behind every screen. A veil above it (rendered by App) keeps content
  * legible; this layer only manages the media and its slow crossfade.
  */
 export default function BackdropReel({ scenes, destCity, destClip = null }: Props) {
+  const [lite] = useState(liteMedia)
   const sceneSlides: HeroSlide[] = scenes.slice(0, 3).map((src, i) => ({
     src,
     alt: ['Arriving in ', 'Streets of ', 'Landmarks of '][i] + (destCity ?? ''),
   }))
-  const slides: HeroSlide[] = destClip
-    ? [{ src: destClip, alt: 'Cinematic aerial of ' + (destCity ?? 'your destination'), video: true }, ...sceneSlides.slice(0, 2)]
-    : sceneSlides.length > 0
-      ? sceneSlides
-      : HERO_REEL
+  const slides: HeroSlide[] =
+    destClip && !lite
+      ? [{ src: destClip, alt: 'Cinematic aerial of ' + (destCity ?? 'your destination'), video: true }, ...sceneSlides.slice(0, 2)]
+      : sceneSlides.length > 0
+        ? sceneSlides
+        : lite
+          ? HERO_REEL_LITE
+          : HERO_REEL
 
   const [index, setIndex] = useState(0)
   const key = slides.map((s) => s.src).join('|')
