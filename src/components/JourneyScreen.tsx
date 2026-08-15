@@ -4,6 +4,7 @@ import { searchAirports, weatherForecast, type PlanOption, type TransferMode, ty
 import { uberRideLink } from '../lib/uber'
 import CustomSteps from './CustomSteps'
 import StaysPanel from './StaysPanel'
+import { exportPlanPdf } from '../lib/exportPlan'
 import type { LiveLeaveBy } from '../lib/useTripPlan'
 
 type Props = {
@@ -23,21 +24,6 @@ type Props = {
   goLocked: () => void
 }
 
-/** Plain-text itinerary — the "keep it somewhere safe" copy of the plan. */
-function itineraryText(option: PlanOption, routeLabel: string, shareUrl: string | null) {
-  const lines = [
-    'MEGUAZ TRIP PLAN — ' + routeLabel,
-    'Total $' + option.cost + ' · ' + option.doorToDoor + ' door to door · leave home by ' + option.leaveBy,
-    '',
-    ...option.steps.map((s) =>
-      [s.time, s.label, s.location, s.cost ?? ''].filter(Boolean).join(' — ')
-    ),
-    '',
-    ...option.costBreakdown.map((c) => '$' + c.amount + '  ' + c.label),
-  ]
-  if (shareUrl) lines.push('', 'Reopen this plan: ' + shareUrl)
-  return lines.join('\n')
-}
 
 // WMO weather codes → a glanceable glyph and a plain word.
 function wmo(code: number): { glyph: string; label: string } {
@@ -198,25 +184,26 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
     }
   }
 
-  const exportPlan = async () => {
+  const exportPlan = () => {
     if (!option) return
-    const text = itineraryText(option, routeLabel, shareUrl)
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: 'Meguaz — ' + routeLabel, text })
-        return
-      }
-    } catch {
-      return // dismissed the sheet; don't also download
+    const opened = exportPlanPdf({
+      option,
+      routeLabel,
+      arriveBy: stay?.checkIn ?? '',
+      nights: stay
+        ? Math.round(
+            (new Date(stay.checkOut + 'T00:00:00').getTime() -
+              new Date(stay.checkIn + 'T00:00:00').getTime()) /
+              86_400_000,
+          )
+        : 0,
+      shareUrl,
+      planKey: (dest?.code ?? 'trip') + ':' + option.departAt,
+    })
+    if (opened) {
+      setShared('export')
+      setTimeout(() => setShared(null), 2200)
     }
-    const blob = new Blob([text], { type: 'text/plain' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'meguaz-' + routeLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.txt'
-    a.click()
-    URL.revokeObjectURL(a.href)
-    setShared('export')
-    setTimeout(() => setShared(null), 2200)
   }
 
   // Departure-airport coordinates power the one-tap Uber deep link on the
@@ -648,50 +635,6 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
             })}
           </div>
 
-          <div
-            className="glass-strong"
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              gap: 12,
-              marginTop: 16,
-              borderRadius: 20,
-              padding: 14,
-            }}
-          >
-            <div style={{ flex: '1 1 120px' }}>
-              <p style={{ fontSize: 11, color: 'var(--color-neutral-600)', margin: 0 }}>
-                Total · {under >= 0 ? '$' + under + ' under budget' : '$' + Math.abs(under) + ' over'}
-              </p>
-              <p style={{ fontFamily: 'var(--font-heading)', fontSize: 24, lineHeight: 1, margin: '3px 0 0' }}>
-                ${option.cost}
-              </p>
-            </div>
-            <button
-              className="hv-accent"
-              onClick={goLocked}
-              style={{
-                flex: '1 1 200px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: '14px 20px',
-                border: 0,
-                borderRadius: 999,
-                background: 'var(--color-accent)',
-                color: 'var(--color-bg)',
-                fontFamily: 'var(--font-heading)',
-                fontSize: 14,
-                cursor: 'pointer',
-              }}
-            >
-              <Icon name="lock" size={15} />
-              Lock in this plan
-            </button>
-          </div>
-
           {/* Take it with you: invite the people you're travelling with, keep
               a copy that outlives the tab. */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
@@ -753,6 +696,52 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
               adults={stay.adults}
             />
           )}
+
+          {/* The final word: everything above is the trip; this is the button
+              that makes it real. Last on purpose. */}
+          <div
+            className="glass-strong"
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 12,
+              marginTop: 16,
+              borderRadius: 20,
+              padding: 14,
+            }}
+          >
+            <div style={{ flex: '1 1 120px' }}>
+              <p style={{ fontSize: 11, color: 'var(--color-neutral-600)', margin: 0 }}>
+                Total · {under >= 0 ? '$' + under + ' under budget' : '$' + Math.abs(under) + ' over'}
+              </p>
+              <p style={{ fontFamily: 'var(--font-heading)', fontSize: 24, lineHeight: 1, margin: '3px 0 0' }}>
+                ${option.cost}
+              </p>
+            </div>
+            <button
+              className="hv-accent"
+              onClick={goLocked}
+              style={{
+                flex: '1 1 200px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '14px 20px',
+                border: 0,
+                borderRadius: 999,
+                background: 'var(--color-accent)',
+                color: 'var(--color-bg)',
+                fontFamily: 'var(--font-heading)',
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="lock" size={15} />
+              Lock in this plan
+            </button>
+          </div>
         </div>
       </div>
     </div>

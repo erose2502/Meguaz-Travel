@@ -312,6 +312,11 @@ export default function PlannerScreen(props: Props) {
           alignItems: 'center',
           gap: 'clamp(14px,2.4vw,28px)',
           marginBottom: 14,
+          // Popovers (calendar, departs) must paint over the banners and
+          // cards below; without this the strip has no stacking context and
+          // later siblings win.
+          position: 'relative',
+          zIndex: 6,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -375,7 +380,9 @@ export default function PlannerScreen(props: Props) {
           />
         )}
 
-        <div style={{ marginLeft: 'auto', minWidth: 230, flex: '0 1 300px' }}>
+        {/* Grows to fill its row — pinned right it left a dead hole when the
+            control count pushed it onto a second line. */}
+        <div style={{ minWidth: 230, flex: '1 1 260px' }}>
           <p style={{ fontSize: 11, color: 'var(--color-neutral-700)', margin: '0 0 5px' }}>
             What matters most this trip?
           </p>
