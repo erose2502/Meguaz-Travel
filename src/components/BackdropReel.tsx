@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { HERO_REEL, HERO_REEL_LITE, type HeroSlide } from '../data/media'
+import { HERO_REEL, HERO_REEL_LITE, img, type HeroSlide } from '../data/media'
 
 type Props = {
   /** Destination stills; take over the reel once a destination is chosen. */
@@ -91,7 +91,7 @@ export default function BackdropReel({ scenes, destCity, destClip = null }: Prop
       {/* Instant ground: a ~300KB still paints immediately, so the page never
           shows a void while the first video streams in over it. */}
       <img
-        src="/media/plan-fjords.jpg"
+        src={img('/media/plan-fjords.jpg')}
         alt=""
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
       />

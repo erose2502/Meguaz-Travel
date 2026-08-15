@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { gsap } from 'gsap'
 import Icon, { type IconName } from './Icon'
 import Spinner, { Skeleton } from './Spinner'
@@ -17,6 +17,8 @@ type Props = {
   arriveBy: string
   nights: number
   budget: number
+  /** Commits a new budget cap; the solver re-prices the three routes. */
+  onBudget: (budget: number) => void
   onSelect: (option: PlanOption) => void
   goHome: () => void
 }
@@ -68,6 +70,50 @@ function BriefItem({ icon, label, value }: { icon: IconName; label: string; valu
   )
 }
 
+/** The budget stays editable after the first solve — travellers discover the
+    real fares and want to nudge the cap without restarting the brief. Commits
+    on blur/Enter only: every commit spends a Duffel offer request. */
+function BudgetItem({ budget, onBudget }: { budget: number; onBudget: (b: number) => void }) {
+  const [draft, setDraft] = useState(String(budget))
+  useEffect(() => setDraft(String(budget)), [budget])
+  const commit = () => {
+    const n = Math.round(Number(draft))
+    if (Number.isFinite(n) && n >= 50 && n <= 100000 && n !== budget) onBudget(n)
+    else setDraft(String(budget))
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <Icon name="wallet" size={16} color="var(--color-accent-2-700)" style={{ flex: 'none' }} />
+      <div>
+        <p style={MICRO}>Budget cap</p>
+        <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 13, fontWeight: 700 }}>
+          $
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ''))}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            }}
+            inputMode="numeric"
+            aria-label="Budget cap in dollars"
+            style={{
+              width: Math.max(3, draft.length) + 'ch',
+              border: 0,
+              borderBottom: '1.5px dashed var(--color-accent-2-500)',
+              background: 'transparent',
+              font: 'inherit',
+              fontWeight: 700,
+              color: 'inherit',
+              padding: '1px 1px 0',
+            }}
+          />
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function freshness(lastUpdated: number | null) {
   if (!lastUpdated) return ''
   const secs = Math.max(0, Math.round((Date.now() - lastUpdated) / 1000))
@@ -88,6 +134,7 @@ export default function PlannerScreen(props: Props) {
     arriveBy,
     nights,
     budget,
+    onBudget,
     onSelect,
     goHome,
   } = props
@@ -226,7 +273,7 @@ export default function PlannerScreen(props: Props) {
 
         <BriefItem icon="calendar" label="Arrive by" value={arriveBy} />
         <BriefItem icon="clock" label="Trip length" value={nights + ' nights · back ' + returnBy} />
-        <BriefItem icon="wallet" label="Budget cap" value={'$' + budget} />
+        <BudgetItem budget={budget} onBudget={onBudget} />
         {stay && (
           <BriefItem
             icon="home"

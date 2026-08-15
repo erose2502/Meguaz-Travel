@@ -21,7 +21,7 @@ import LegalScreen from './components/LegalScreen'
 import ConsentBanner from './components/ConsentBanner'
 import MusicDock from './components/MusicDock'
 import { DESTINATIONS, type Destination } from './data/destinations'
-import { DEST_HERO_CLIPS } from './data/media'
+import { DEST_HERO_CLIPS, img } from './data/media'
 import { PHRASES, SPEECH_TAGS } from './data/phrases'
 import { sceneUrls } from './data/scenes'
 import { searchDestinations } from './lib/search'
@@ -279,7 +279,7 @@ export default function App({
   }
   // Generated Seedream/Z-Image scenes, served from our own media dir — no
   // third-party image API at runtime.
-  const scenes = dest ? sceneUrls(dest.code) : []
+  const scenes = dest ? sceneUrls(dest.code).map(img) : []
 
   const home = useHomeCity(homeCity)
   // An IATA code is unambiguous; a city name is not ("Reading" resolves to
@@ -610,6 +610,7 @@ export default function App({
               arriveBy={arriveBy}
               nights={nights}
               budget={budget}
+              onBudget={setBudget}
               onSelect={(option) => {
                 setSelected(option)
                 go('journey')()

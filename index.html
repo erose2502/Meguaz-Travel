@@ -27,8 +27,9 @@
     </noscript>
     <!-- The hero's poster paints the first frame while videos defer. Low
          priority on purpose: it must never outrank the JS bundle or the boot
-         scene photo on a slow connection. -->
-    <link rel="preload" as="image" href="/media/plan-fjords.jpg" fetchpriority="low" />
+         scene photo on a slow connection. Phones preload the -m variant. -->
+    <link rel="preload" as="image" href="/media/plan-fjords-m.jpg" fetchpriority="low" media="(max-width: 767px)" />
+    <link rel="preload" as="image" href="/media/plan-fjords.jpg" fetchpriority="low" media="(min-width: 768px)" />
     <script>
       // Self-heal for stale shells: if the app bundle 404s or arrives as the
       // wrong type after a deploy rotated the hashes, pull a fresh shell once
@@ -213,7 +214,9 @@
             img.onload = function () {
               img.style.opacity = '1'
             }
-            img.src = '/media/scenes/' + code + '-1.jpg'
+            // Phones get the ~70KB "-m" variant; the boot photo must win the
+            // bandwidth race against the bundle, not fight it.
+            img.src = '/media/scenes/' + code + (window.innerWidth < 768 ? '-1-m.jpg' : '-1.jpg')
           }
           var city = document.getElementById('mg-boot-city')
           if (city) city.textContent = scenes[code]

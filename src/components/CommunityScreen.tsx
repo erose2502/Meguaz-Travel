@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
 import Spinner from './Spinner'
+import { img } from '../data/media'
 import {
   searchCommunity,
   setFollowing,
@@ -75,7 +76,8 @@ function cityFor(code: string): string {
  * the stars and words carry the opinion. */
 function FeedCard({ item }: { item: CommunityFeedItem }) {
   const [imgDead, setImgDead] = useState(false)
-  const scene = sceneUrls(item.destinationCode)[1] ?? sceneUrls(item.destinationCode)[0] ?? null
+  const raw = sceneUrls(item.destinationCode)[1] ?? sceneUrls(item.destinationCode)[0] ?? null
+  const scene = raw ? img(raw) : null
   return (
     <article className="glass" style={{ borderRadius: 20, overflow: 'hidden' }}>
       <div
