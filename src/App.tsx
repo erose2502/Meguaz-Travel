@@ -86,7 +86,10 @@ const PRIORITY_TO_STYLE: Record<Priority, 'saver' | 'balanced' | 'comfort'> = {
 function isoInDays(days: number) {
   const d = new Date()
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  // Local calendar date — toISOString flips to tomorrow after ~8 PM in the
+  // Americas and every brief default would drift a day.
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
 }
 
 // A shared plan link recreates the brief: /?to=LIS&arrive=2026-09-10&nights=5&budget=900

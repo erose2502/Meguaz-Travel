@@ -46,9 +46,16 @@ export function formatFriendly(iso: string) {
   return weekday + ', ' + MONTHS[m].slice(0, 3) + ' ' + d
 }
 
+/** Local-calendar ISO. Never toISOString here: that converts to UTC, which
+    after ~8 PM in the Americas is already *tomorrow* — it disabled "today",
+    misplaced the today-dot, and made every quick-pick land one day off. */
+function localIso(d: Date) {
+  return toIso(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
 export default function DatePicker({ value, onChange, id = 'mg-date' }: Props) {
   const [open, setOpen] = useState(false)
-  const initial = parseIso(value || new Date().toISOString().slice(0, 10))
+  const initial = parseIso(value || localIso(new Date()))
   const [view, setView] = useState({ y: initial.y, m: initial.m })
   const boxRef = useRef<HTMLDivElement>(null)
 
@@ -70,12 +77,12 @@ export default function DatePicker({ value, onChange, id = 'mg-date' }: Props) {
 
   useEffect(() => {
     if (open) {
-      const p = parseIso(value || new Date().toISOString().slice(0, 10))
+      const p = parseIso(value || localIso(new Date()))
       setView({ y: p.y, m: p.m })
     }
   }, [open, value])
 
-  const todayIso = new Date().toISOString().slice(0, 10)
+  const todayIso = localIso(new Date())
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate()
   const blanks = leadingBlanks(view.y, view.m)
 
@@ -266,38 +273,46 @@ export default function DatePicker({ value, onChange, id = 'mg-date' }: Props) {
             })}
           </div>
 
-          {/* Nobody flies today — quick-picks that match how trips are planned. */}
+          {/* Nobody flies today — quick-picks that match how trips are planned.
+              Picking one keeps the calendar open and flips it to that month so
+              the traveller SEES the day light up; closing on tap made the chips
+              feel dead. */}
           <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
             {[
               { label: 'In a week', days: 7 },
               { label: 'Two weeks', days: 14 },
               { label: 'A month', days: 30 },
-            ].map((chip) => (
-              <button
-                key={chip.days}
-                type="button"
-                onClick={() => {
-                  const d = new Date()
-                  d.setDate(d.getDate() + chip.days)
-                  onChange(d.toISOString().slice(0, 10))
-                  setOpen(false)
-                }}
-                className="hv-white"
-                style={{
-                  flex: 1,
-                  padding: '8px 0',
-                  borderRadius: 999,
-                  border: '1px solid var(--color-divider)',
-                  background: 'transparent',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: 'var(--color-neutral-700)',
-                  cursor: 'pointer',
-                }}
-              >
-                {chip.label}
-              </button>
-            ))}
+            ].map((chip) => {
+              const d = new Date()
+              d.setDate(d.getDate() + chip.days)
+              const iso = localIso(d)
+              const active = iso === value
+              return (
+                <button
+                  key={chip.days}
+                  type="button"
+                  onClick={() => {
+                    onChange(iso)
+                    setView({ y: d.getFullYear(), m: d.getMonth() })
+                  }}
+                  className={active ? undefined : 'hv-white'}
+                  style={{
+                    flex: 1,
+                    padding: '8px 0',
+                    borderRadius: 999,
+                    border: active ? '1px solid var(--color-accent)' : '1px solid var(--color-divider)',
+                    background: active ? 'var(--color-accent)' : 'transparent',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: active ? 'var(--color-bg)' : 'var(--color-neutral-700)',
+                    cursor: 'pointer',
+                    transition: 'background 140ms ease, color 140ms ease',
+                  }}
+                >
+                  {chip.label}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
