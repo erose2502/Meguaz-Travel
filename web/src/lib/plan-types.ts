@@ -32,6 +32,8 @@ export type TripBrief = {
   /** Travelling with a checked bag: prices the fee when the fare includes
    * none, and pads bag-drop time into the airport plan. */
   checkedBag?: boolean;
+  /** Departure-time window for the outbound leg; "any" (default) skips it. */
+  departWindow?: "any" | "morning" | "afternoon" | "evening";
   // When present, the solver uses a real drive ETA from here to the departure
   // airport instead of a static estimate, sharpening "leave home by".
   originCoords?: { lat: number; lng: number };
@@ -69,6 +71,8 @@ export type PlanOption = {
   steps: TimelineStep[];
   costBreakdown: CostLine[];
   offerId: string | null; // Duffel offer backing the flight leg
+  /** Who flies this: marketing carrier name, IATA, and Duffel-hosted logo. */
+  airline: { name: string; iata: string | null; logo: string | null };
   /** What the fare includes per traveller, plus any estimated checked-bag fee
    * the solver added because the traveller wants one and the fare has none. */
   bags: { carryOn: number; checked: number; feeAdded: number };
@@ -96,6 +100,9 @@ export type SolveResponse = {
   routeLabel: string; // "San Francisco → London"
   /** False when no itinerary lands before the arrive-by deadline; UI warns. */
   meetsDeadline: boolean;
+  /** False when the requested departure window had no offers and the solver
+   * fell back to all departure times. */
+  matchesWindow?: boolean;
   /** YYYY-MM-DD of the priced return leg, when the brief carried a trip length. */
   returnDate: string | null;
   /** Null when no trip length was given or no priced listings came back. */

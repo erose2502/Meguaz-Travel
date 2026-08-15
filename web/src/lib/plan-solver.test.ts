@@ -23,6 +23,8 @@ const offer = (over: Partial<FlightOffer> = {}): FlightOffer => ({
   totalAmount: "500",
   totalCurrency: "USD",
   owner: "Meguaz Air",
+  ownerIata: "MG",
+  ownerLogo: null,
   bags: { carryOn: 1, checked: 0 },
   slices: [slice()],
   ...over,

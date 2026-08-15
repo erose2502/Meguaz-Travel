@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import GlassSelect from './GlassSelect'
 import Icon from './Icon'
 import Spinner from './Spinner'
 import AirportPicker from './AirportPicker'
@@ -328,17 +329,18 @@ export default function ProfileScreen(props: Props) {
                   <label style={LABEL} htmlFor="mg-pref-cabin">
                     Preferred cabin
                   </label>
-                  <select
+                  <GlassSelect
                     id="mg-pref-cabin"
+                    ariaLabel="Preferred cabin"
                     value={cabin}
-                    onChange={(e) => setCabin(e.target.value as CabinClass)}
-                    style={{ ...FIELD, cursor: 'pointer' }}
-                  >
-                    <option value="economy">Economy</option>
-                    <option value="premium_economy">Premium economy</option>
-                    <option value="business">Business</option>
-                    <option value="first">First</option>
-                  </select>
+                    onChange={setCabin}
+                    options={[
+                      { value: 'economy', label: 'Economy' },
+                      { value: 'premium_economy', label: 'Premium economy' },
+                      { value: 'business', label: 'Business' },
+                      { value: 'first', label: 'First' },
+                    ]}
+                  />
                 </div>
                 <div style={{ flex: '1 1 110px' }}>
                   <label style={LABEL} htmlFor="mg-pref-budget">

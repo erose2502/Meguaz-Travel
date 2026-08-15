@@ -32,6 +32,8 @@ export function useTripPlan(brief: TripBrief, active: boolean): PlanState {
     brief.nights ?? '',
     brief.cabinClass ?? '',
     brief.airportTransfer ?? '',
+    brief.checkedBag ?? '',
+    brief.departWindow ?? '',
   ].join('|')
 
   const run = useCallback(

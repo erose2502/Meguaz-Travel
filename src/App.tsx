@@ -32,6 +32,7 @@ import {
   track,
   type BookingResult,
   type CabinClass,
+  type DepartWindow,
   type DestinationGuide,
   type PlanOption,
   type TransferMode,
@@ -156,6 +157,7 @@ export default function App({
   const [cabinClass, setCabinClass] = useState<CabinClass>('economy')
   const [transfer, setTransfer] = useState<TransferMode>('rideshare')
   const [checkedBag, setCheckedBag] = useState(false)
+  const [departWindow, setDepartWindow] = useState<DepartWindow>('any')
   const [originIata, setOriginIata] = useState<string | null>(null)
   const account = useAccount()
   const tripsState = useTrips(!!account.user)
@@ -302,6 +304,7 @@ export default function App({
     airportTransfer: transfer,
     cabinClass,
     checkedBag,
+    departWindow,
     ...(home.coords && departureIsNearby ? { originCoords: home.coords } : {}),
   }
   const { plan, loading, refreshing, error, lastUpdated, refresh } = useTripPlan(brief, planActive)
@@ -611,9 +614,15 @@ export default function App({
               priority={priority}
               onPriority={setPriority}
               arriveBy={arriveBy}
+              onArriveBy={setArriveBy}
               nights={nights}
+              onNights={(n) => setNights(Math.min(90, Math.max(1, n)))}
+              adults={adults}
+              onAdults={(n) => setAdults(Math.min(9, Math.max(1, n)))}
               budget={budget}
               onBudget={setBudget}
+              departWindow={departWindow}
+              onDepartWindow={setDepartWindow}
               onSelect={(option) => {
                 setSelected(option)
                 go('journey')()
@@ -625,6 +634,16 @@ export default function App({
           {screen === 'journey' && (
             <JourneyScreen
               transfer={transfer}
+              shareUrl={
+                dest
+                  ? window.location.origin +
+                    '/?to=' + dest.code +
+                    '&arrive=' + arriveBy +
+                    '&nights=' + nights +
+                    '&budget=' + budget +
+                    '&adults=' + adults
+                  : null
+              }
               stay={
                 dest
                   ? {

@@ -129,7 +129,25 @@ export async function solveTrip(brief: TripBrief): Promise<SolveResponse | null>
   // Prefer itineraries that meet the deadline; if none do, fall back to the full
   // set rather than showing nothing, and flag it on the response.
   const meetsDeadline = onTime.length > 0;
-  const usable = (meetsDeadline ? onTime : all).slice(0, 20);
+  let usable = (meetsDeadline ? onTime : all).slice(0, 20);
+
+  // Departure-time window: hour is taken from the ISO string directly, which
+  // keeps it in the departure airport's local clock. Morning 5–11, afternoon
+  // 12–17, evening 18–4 (red-eyes count as evening). If the window empties the
+  // set we fall back to all times and say so, rather than showing nothing.
+  let matchesWindow = true;
+  const window_ = brief.departWindow ?? "any";
+  if (window_ !== "any") {
+    const inWindow = usable.filter((o) => {
+      const hour = Number(o.slices[0].departingAt.slice(11, 13));
+      if (Number.isNaN(hour)) return true;
+      if (window_ === "morning") return hour >= 5 && hour < 12;
+      if (window_ === "afternoon") return hour >= 12 && hour < 18;
+      return hour >= 18 || hour < 5;
+    });
+    if (inWindow.length > 0) usable = inWindow;
+    else matchesWindow = false;
+  }
 
   const byPrice = [...usable].sort((a, b) => Number(a.totalAmount) - Number(b.totalAmount));
   const byCalm = [...usable].sort((a, b) => calmScore(a) - calmScore(b));
@@ -187,6 +205,7 @@ export async function solveTrip(brief: TripBrief): Promise<SolveResponse | null>
     brief,
     routeLabel: `${title(brief.from)} → ${title(brief.to)}`,
     meetsDeadline,
+    matchesWindow,
     returnDate: returnDate ?? null,
     stay: stayEstimate(stays, brief.nights ?? 0),
     originAdvice,
@@ -491,6 +510,7 @@ export function buildOption(
     steps,
     costBreakdown,
     offerId: offer.id,
+    airline: { name: offer.owner, iata: offer.ownerIata, logo: offer.ownerLogo },
     bags: { carryOn: offer.bags.carryOn, checked: offer.bags.checked, feeAdded: bagFee },
     etaFromLocation: Boolean(drive),
     etaTrafficAware: Boolean(drive?.trafficAware),

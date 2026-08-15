@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from 'react'
+import GlassSelect from './GlassSelect'
 import Icon from './Icon'
 import Spinner from './Spinner'
 import { bookFlight, ApiError, type BookingPassenger, type BookingResult, type PlanOption } from '../lib/api'
@@ -166,16 +167,17 @@ export default function BookingSheet({ option, destCity, adults, email, onClose,
             <div style={{ display: 'grid', gridTemplateColumns: '86px 1fr 1fr', gap: 10 }}>
               <div>
                 <label style={LABEL}>Title</label>
-                <select
+                <GlassSelect
+                  ariaLabel="Title"
                   value={p.title}
-                  onChange={(e) => setP(i, { title: e.target.value as BookingPassenger['title'] })}
-                  style={{ ...FIELD, cursor: 'pointer' }}
-                >
-                  <option value="ms">Ms</option>
-                  <option value="mr">Mr</option>
-                  <option value="mrs">Mrs</option>
-                  <option value="miss">Miss</option>
-                </select>
+                  onChange={(v) => setP(i, { title: v as BookingPassenger['title'] })}
+                  options={[
+                    { value: 'ms', label: 'Ms' },
+                    { value: 'mr', label: 'Mr' },
+                    { value: 'mrs', label: 'Mrs' },
+                    { value: 'miss', label: 'Miss' },
+                  ]}
+                />
               </div>
               <div>
                 <label style={LABEL}>First name</label>
@@ -200,14 +202,15 @@ export default function BookingSheet({ option, destCity, adults, email, onClose,
               </div>
               <div>
                 <label style={LABEL}>Gender</label>
-                <select
+                <GlassSelect
+                  ariaLabel="Gender"
                   value={p.gender}
-                  onChange={(e) => setP(i, { gender: e.target.value as 'm' | 'f' })}
-                  style={{ ...FIELD, cursor: 'pointer' }}
-                >
-                  <option value="f">Female</option>
-                  <option value="m">Male</option>
-                </select>
+                  onChange={(v) => setP(i, { gender: v as 'm' | 'f' })}
+                  options={[
+                    { value: 'f', label: 'Female' },
+                    { value: 'm', label: 'Male' },
+                  ]}
+                />
               </div>
             </div>
           </div>

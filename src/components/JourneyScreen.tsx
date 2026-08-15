@@ -17,8 +17,26 @@ type Props = {
   transfer: TransferMode
   /** Stay-search window for the live rentals/hotels panel. */
   stay: { location: string; checkIn: string; checkOut: string; adults: number } | null
+  /** Recreates this exact brief when opened — the invite and the backup. */
+  shareUrl: string | null
   goPlanner: () => void
   goLocked: () => void
+}
+
+/** Plain-text itinerary — the "keep it somewhere safe" copy of the plan. */
+function itineraryText(option: PlanOption, routeLabel: string, shareUrl: string | null) {
+  const lines = [
+    'MEGUAZ TRIP PLAN — ' + routeLabel,
+    'Total $' + option.cost + ' · ' + option.doorToDoor + ' door to door · leave home by ' + option.leaveBy,
+    '',
+    ...option.steps.map((s) =>
+      [s.time, s.label, s.location, s.cost ?? ''].filter(Boolean).join(' — ')
+    ),
+    '',
+    ...option.costBreakdown.map((c) => '$' + c.amount + '  ' + c.label),
+  ]
+  if (shareUrl) lines.push('', 'Reopen this plan: ' + shareUrl)
+  return lines.join('\n')
 }
 
 // WMO weather codes → a glanceable glyph and a plain word.
@@ -158,7 +176,49 @@ const STEP_ICON: Record<string, IconName> = {
   train: 'tram',
 }
 
-export default function JourneyScreen({ option, routeLabel, budget, live, dest, transfer, stay, goPlanner, goLocked }: Props) {
+export default function JourneyScreen({ option, routeLabel, budget, live, dest, transfer, stay, shareUrl, goPlanner, goLocked }: Props) {
+  const [shared, setShared] = useState<'invite' | 'export' | null>(null)
+
+  const invite = async () => {
+    if (!shareUrl) return
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Meguaz — ' + routeLabel,
+          text: 'Join my trip: ' + routeLabel,
+          url: shareUrl,
+        })
+      } else {
+        await navigator.clipboard.writeText(shareUrl)
+        setShared('invite')
+        setTimeout(() => setShared(null), 2200)
+      }
+    } catch {
+      /* user dismissed the share sheet */
+    }
+  }
+
+  const exportPlan = async () => {
+    if (!option) return
+    const text = itineraryText(option, routeLabel, shareUrl)
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Meguaz — ' + routeLabel, text })
+        return
+      }
+    } catch {
+      return // dismissed the sheet; don't also download
+    }
+    const blob = new Blob([text], { type: 'text/plain' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'meguaz-' + routeLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.txt'
+    a.click()
+    URL.revokeObjectURL(a.href)
+    setShared('export')
+    setTimeout(() => setShared(null), 2200)
+  }
+
   // Departure-airport coordinates power the one-tap Uber deep link on the
   // rideshare leg. Resolved lazily from the airport index by exact IATA.
   const [uberDrop, setUberDrop] = useState<{ lat: number; lng: number; name: string } | null>(null)
@@ -629,6 +689,56 @@ export default function JourneyScreen({ option, routeLabel, budget, live, dest, 
             >
               <Icon name="lock" size={15} />
               Lock in this plan
+            </button>
+          </div>
+
+          {/* Take it with you: invite the people you're travelling with, keep
+              a copy that outlives the tab. */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+            <button
+              className="hv-soft"
+              onClick={invite}
+              disabled={!shareUrl}
+              style={{
+                flex: '1 1 150px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 7,
+                padding: '11px 16px',
+                borderRadius: 999,
+                border: '1px solid rgba(46,43,37,0.16)',
+                background: 'rgba(255,255,255,0.55)',
+                fontSize: 13,
+                fontWeight: 700,
+                color: 'var(--color-text)',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="heart" size={14} color="var(--color-accent-700)" />
+              {shared === 'invite' ? 'Link copied ✓' : 'Invite a friend'}
+            </button>
+            <button
+              className="hv-soft"
+              onClick={exportPlan}
+              style={{
+                flex: '1 1 150px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 7,
+                padding: '11px 16px',
+                borderRadius: 999,
+                border: '1px solid rgba(46,43,37,0.16)',
+                background: 'rgba(255,255,255,0.55)',
+                fontSize: 13,
+                fontWeight: 700,
+                color: 'var(--color-text)',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="download" size={14} color="var(--color-accent-2-700)" />
+              {shared === 'export' ? 'Saved ✓' : 'Export plan'}
             </button>
           </div>
 

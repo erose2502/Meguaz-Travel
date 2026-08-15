@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import GlassSelect from './GlassSelect'
 import Icon from './Icon'
 import DatePicker from './DatePicker'
 import AirportPicker from './AirportPicker'
@@ -461,17 +462,18 @@ export default function TripBriefBar(props: Props) {
           <label style={LABEL} htmlFor="mg-cabin">
             Cabin
           </label>
-          <select
+          <GlassSelect
             id="mg-cabin"
+            ariaLabel="Cabin class"
             value={cabinClass}
-            onChange={(e) => onCabinClass(e.target.value as CabinClass)}
-            style={{ ...FIELD, cursor: 'pointer' }}
-          >
-            <option value="economy">Economy</option>
-            <option value="premium_economy">Premium economy</option>
-            <option value="business">Business</option>
-            <option value="first">First</option>
-          </select>
+            onChange={onCabinClass}
+            options={[
+              { value: 'economy', label: 'Economy' },
+              { value: 'premium_economy', label: 'Premium economy' },
+              { value: 'business', label: 'Business' },
+              { value: 'first', label: 'First' },
+            ]}
+          />
         </div>
 
         {/* Travellers */}
@@ -551,55 +553,33 @@ export default function TripBriefBar(props: Props) {
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-neutral-700)' }}>
           <Icon name="car" size={13} color="var(--color-neutral-600)" />
           Getting there
-          <select
+          <GlassSelect
+            ariaLabel="How you get to the airport"
+            variant="chip"
             value={transfer}
-            onChange={(e) => onTransfer(e.target.value as TransferMode)}
-            aria-label="How you get to the airport"
-            style={{
-              height: 30,
-              padding: '0 10px',
-              borderRadius: 999,
-              border: '1px solid var(--color-divider)',
-              background: 'rgba(255,255,255,0.6)',
-              font: 'inherit',
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'var(--color-text)',
-              cursor: 'pointer',
-              outline: 'none',
-            }}
-          >
-            <option value="rideshare">Rideshare</option>
-            <option value="drive">Drive & park</option>
-            <option value="dropoff">Drop-off</option>
-            <option value="transit">Transit</option>
-          </select>
+            onChange={onTransfer}
+            options={[
+              { value: 'rideshare', label: 'Rideshare' },
+              { value: 'drive', label: 'Drive & park' },
+              { value: 'dropoff', label: 'Drop-off' },
+              { value: 'transit', label: 'Transit' },
+            ]}
+          />
         </span>
 
         {/* Luggage changes the fare (bag fees) and the airport clock (bag drop) */}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-neutral-700)' }}>
           Luggage
-          <select
+          <GlassSelect
+            ariaLabel="Luggage"
+            variant="chip"
             value={checkedBag ? 'checked' : 'carryon'}
-            onChange={(e) => onCheckedBag(e.target.value === 'checked')}
-            aria-label="Luggage"
-            style={{
-              height: 30,
-              padding: '0 10px',
-              borderRadius: 999,
-              border: '1px solid var(--color-divider)',
-              background: 'rgba(255,255,255,0.6)',
-              font: 'inherit',
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'var(--color-text)',
-              cursor: 'pointer',
-              outline: 'none',
-            }}
-          >
-            <option value="carryon">Carry-on only</option>
-            <option value="checked">+ Checked bag</option>
-          </select>
+            onChange={(v) => onCheckedBag(v === 'checked')}
+            options={[
+              { value: 'carryon', label: 'Carry-on only' },
+              { value: 'checked', label: '+ Checked bag' },
+            ]}
+          />
         </span>
 
         {adults > 1 && (

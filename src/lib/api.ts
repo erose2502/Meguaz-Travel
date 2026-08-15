@@ -35,6 +35,8 @@ export type PlanOption = {
   steps: TimelineStep[]
   costBreakdown: CostLine[]
   offerId: string | null
+  /** Who flies this: marketing carrier name, IATA, and logo URL. */
+  airline: { name: string; iata: string | null; logo: string | null }
   /** Fare's per-traveller baggage allowance + any estimated fee added. */
   bags: { carryOn: number; checked: number; feeAdded: number }
   etaFromLocation: boolean
@@ -61,8 +63,12 @@ export type TripBrief = {
   cabinClass?: CabinClass
   /** Checked bag wanted: prices the fee when the fare includes none. */
   checkedBag?: boolean
+  /** Departure-time window for the outbound leg; 'any' skips the filter. */
+  departWindow?: DepartWindow
   originCoords?: { lat: number; lng: number }
 }
+
+export type DepartWindow = 'any' | 'morning' | 'afternoon' | 'evening'
 
 export type NearbyAirport = {
   iata: string
@@ -83,6 +89,8 @@ export type SolveResponse = {
   brief: TripBrief
   routeLabel: string
   meetsDeadline: boolean
+  /** False when the departure-window filter had no offers and all times show. */
+  matchesWindow?: boolean
   /** Return-leg date when the brief carried a trip length. */
   returnDate: string | null
   /** Median nightly stay estimate for the window, when nights were given. */

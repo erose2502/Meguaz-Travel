@@ -22,6 +22,9 @@ export type FlightOffer = {
   totalAmount: string;
   totalCurrency: string;
   owner: string;
+  /** Marketing carrier identity for the option cards. */
+  ownerIata: string | null;
+  ownerLogo: string | null;
   /** Per-passenger baggage the fare includes (from the first segment). */
   bags: { carryOn: number; checked: number };
   slices: Array<{
@@ -75,6 +78,9 @@ export async function searchFlights(params: FlightSearchParams): Promise<FlightO
     totalAmount: o.total_amount,
     totalCurrency: o.total_currency,
     owner: o.owner?.name ?? "Unknown airline",
+    ownerIata: o.owner?.iata_code ?? null,
+    ownerLogo:
+      (o.owner as { logo_symbol_url?: string | null } | undefined)?.logo_symbol_url ?? null,
     bags: includedBags(o),
     slices: (o.slices ?? []).map((s) => ({
       origin: s.origin?.iata_code ?? "",

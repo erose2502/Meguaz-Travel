@@ -2,7 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { gsap } from 'gsap'
 import Icon, { type IconName } from './Icon'
 import Spinner, { Skeleton } from './Spinner'
-import type { PlanOption, SolveResponse } from '../lib/api'
+import DatePicker from './DatePicker'
+import GlassSelect from './GlassSelect'
+import type { DepartWindow, PlanOption, SolveResponse } from '../lib/api'
 import type { Priority } from '../types'
 
 type Props = {
@@ -15,10 +17,16 @@ type Props = {
   priority: Priority
   onPriority: (p: Priority) => void
   arriveBy: string
+  onArriveBy: (value: string) => void
   nights: number
+  onNights: (value: number) => void
+  adults: number
+  onAdults: (value: number) => void
   budget: number
   /** Commits a new budget cap; the solver re-prices the three routes. */
   onBudget: (budget: number) => void
+  departWindow: DepartWindow
+  onDepartWindow: (w: DepartWindow) => void
   onSelect: (option: PlanOption) => void
   goHome: () => void
 }
@@ -114,6 +122,47 @@ function BudgetItem({ budget, onBudget }: { budget: number; onBudget: (b: number
   )
 }
 
+/** Compact −/+ count for the brief strip. */
+function MiniCount({
+  value,
+  min,
+  max,
+  onChange,
+  label,
+}: {
+  value: number
+  min: number
+  max: number
+  onChange: (v: number) => void
+  label: string
+}) {
+  const btn = (disabled: boolean): CSSProperties => ({
+    width: 24,
+    height: 24,
+    flex: 'none',
+    borderRadius: 999,
+    border: 0,
+    background: disabled ? 'transparent' : 'rgba(255,255,255,0.85)',
+    boxShadow: disabled ? 'none' : '0 1px 3px rgba(46,43,37,0.15)',
+    fontSize: 14,
+    fontWeight: 700,
+    lineHeight: 1,
+    color: disabled ? 'var(--color-neutral-400)' : 'var(--color-text)',
+    cursor: disabled ? 'default' : 'pointer',
+  })
+  return (
+    <span role="group" aria-label={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+      <button type="button" aria-label={'Fewer ' + label.toLowerCase()} disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))} style={btn(value <= min)}>
+        −
+      </button>
+      <span style={{ fontSize: 13, fontWeight: 700, minWidth: 18, textAlign: 'center' }}>{value}</span>
+      <button type="button" aria-label={'More ' + label.toLowerCase()} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))} style={btn(value >= max)}>
+        +
+      </button>
+    </span>
+  )
+}
+
 function freshness(lastUpdated: number | null) {
   if (!lastUpdated) return ''
   const secs = Math.max(0, Math.round((Date.now() - lastUpdated) / 1000))
@@ -132,9 +181,15 @@ export default function PlannerScreen(props: Props) {
     priority,
     onPriority,
     arriveBy,
+    onArriveBy,
     nights,
+    onNights,
+    adults,
+    onAdults,
     budget,
     onBudget,
+    departWindow,
+    onDepartWindow,
     onSelect,
     goHome,
   } = props
@@ -271,9 +326,47 @@ export default function PlannerScreen(props: Props) {
           </div>
         </div>
 
-        <BriefItem icon="calendar" label="Arrive by" value={arriveBy} />
-        <BriefItem icon="clock" label="Trip length" value={nights + ' nights · back ' + returnBy} />
+        {/* The whole brief stays editable after the first solve — real fares
+            change minds, and going back to Home to change a date is a wall. */}
+        <div style={{ flex: '0 1 168px', minWidth: 150 }}>
+          <p style={MICRO}>Arrive by</p>
+          <div style={{ marginTop: 3 }}>
+            <DatePicker value={arriveBy} onChange={onArriveBy} id="mg-plan-date" />
+          </div>
+        </div>
+
+        <div>
+          <p style={MICRO}>Nights</p>
+          <MiniCount value={nights} min={1} max={90} onChange={onNights} label="Nights" />
+          <p style={{ fontSize: 10.5, color: 'var(--color-neutral-600)', margin: '3px 0 0' }}>
+            back {returnBy}
+          </p>
+        </div>
+
+        <div>
+          <p style={MICRO}>Travellers</p>
+          <MiniCount value={adults} min={1} max={9} onChange={onAdults} label="Travellers" />
+        </div>
+
         <BudgetItem budget={budget} onBudget={onBudget} />
+
+        <div>
+          <p style={MICRO}>Departs</p>
+          <div style={{ marginTop: 3 }}>
+            <GlassSelect
+              ariaLabel="Departure time window"
+              variant="chip"
+              value={departWindow}
+              onChange={onDepartWindow}
+              options={[
+                { value: 'any', label: 'Any time' },
+                { value: 'morning', label: 'Morning' },
+                { value: 'afternoon', label: 'Afternoon' },
+                { value: 'evening', label: 'Evening' },
+              ]}
+            />
+          </div>
+        </div>
         {stay && (
           <BriefItem
             icon="home"
@@ -324,6 +417,12 @@ export default function PlannerScreen(props: Props) {
       {plan && !plan.meetsDeadline && (
         <p style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--color-accent-800)', margin: '0 0 12px' }}>
           Nothing lands before your arrive-by time. These are the closest options.
+        </p>
+      )}
+
+      {plan && plan.matchesWindow === false && (
+        <p style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--color-accent-800)', margin: '0 0 12px' }}>
+          No {departWindow} departures on this route for that day — showing all departure times.
         </p>
       )}
 
@@ -430,6 +529,40 @@ export default function PlannerScreen(props: Props) {
                   <p style={{ fontSize: 12, color: 'var(--color-neutral-700)', margin: '3px 0 0' }}>
                     {route.tagline}
                   </p>
+                  {route.airline && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        marginTop: 8,
+                        padding: '4px 10px 4px 5px',
+                        borderRadius: 999,
+                        background: 'rgba(255,255,255,0.65)',
+                        border: '1px solid rgba(46,43,37,0.1)',
+                      }}
+                    >
+                      {route.airline.logo ? (
+                        <img
+                          src={route.airline.logo}
+                          alt=""
+                          width={18}
+                          height={18}
+                          loading="lazy"
+                          style={{ borderRadius: 5, display: 'block' }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      ) : (
+                        <Icon name="plane" size={13} color="var(--color-neutral-600)" />
+                      )}
+                      <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--color-neutral-800)' }}>
+                        {route.airline.name}
+                        {route.airline.iata ? ' · ' + route.airline.iata : ''}
+                      </span>
+                    </span>
+                  )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p style={{ fontFamily: 'var(--font-heading)', fontSize: 24, lineHeight: 1, margin: 0 }}>
