@@ -25,8 +25,10 @@
         href="https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap"
       />
     </noscript>
-    <!-- The hero's poster paints the first frame while videos defer. -->
-    <link rel="preload" as="image" href="/media/plan-fjords.jpg" fetchpriority="high" />
+    <!-- The hero's poster paints the first frame while videos defer. Low
+         priority on purpose: it must never outrank the JS bundle or the boot
+         scene photo on a slow connection. -->
+    <link rel="preload" as="image" href="/media/plan-fjords.jpg" fetchpriority="low" />
     <script>
       // Self-heal for stale shells: if the app bundle 404s or arrives as the
       // wrong type after a deploy rotated the hashes, pull a fresh shell once
@@ -171,7 +173,7 @@
         }
       </style>
       <div id="mg-boot" role="status" aria-label="Loading Meguaz">
-        <img class="bg" id="mg-boot-img" alt="" />
+        <img class="bg" id="mg-boot-img" alt="" fetchpriority="high" />
         <div class="veil"></div>
         <div class="top">
           <div class="word">Meguaz</div>
