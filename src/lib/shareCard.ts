@@ -42,6 +42,133 @@ function heading(): string {
   return face || 'Georgia'
 }
 
+export type JournalCard = {
+  code: string
+  city: string
+  rating: number
+  title: string | null
+  body: string | null
+  author: string
+}
+
+function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number) {
+  const words = text.split(/\s+/)
+  const lines: string[] = []
+  let line = ''
+  for (const word of words) {
+    const next = line ? line + ' ' + word : word
+    if (ctx.measureText(next).width > maxWidth && line) {
+      lines.push(line)
+      line = word
+      if (lines.length === maxLines) break
+    } else {
+      line = next
+    }
+  }
+  if (lines.length < maxLines && line) lines.push(line)
+  else if (lines.length === maxLines) lines[maxLines - 1] = lines[maxLines - 1].replace(/\s+\S*$/, '') + '…'
+  return lines
+}
+
+/** A traveller's journal entry as a story-sized postcard: their words over
+    the destination scene, ready for the share sheet or a saved export. */
+export async function shareJournalCard(card: JournalCard): Promise<'shared' | 'downloaded'> {
+  await document.fonts.ready
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas unavailable')
+
+  const scene = await loadScene(card.code)
+  if (scene) {
+    drawCover(ctx, scene)
+  } else {
+    const g = ctx.createLinearGradient(0, 0, W, H)
+    g.addColorStop(0, '#0d3b3e')
+    g.addColorStop(0.55, '#155e63')
+    g.addColorStop(1, '#0a2a2d')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, W, H)
+  }
+
+  const veil = ctx.createLinearGradient(0, 0, 0, H)
+  veil.addColorStop(0, 'rgba(10,20,22,0.62)')
+  veil.addColorStop(0.3, 'rgba(10,20,22,0.05)')
+  veil.addColorStop(0.52, 'rgba(10,20,22,0.28)')
+  veil.addColorStop(1, 'rgba(8,16,18,0.92)')
+  ctx.fillStyle = veil
+  ctx.fillRect(0, 0, W, H)
+
+  const face = heading()
+  ctx.textAlign = 'center'
+
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'
+  ctx.font = '400 40px ' + face + ', Georgia, serif'
+  ctx.fillText('M E G U A Z', W / 2, 150)
+
+  let y = H - 220 - 60 * 0 // baseline anchor built upward below
+  // Footer
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
+  ctx.font = '400 30px system-ui, sans-serif'
+  ctx.fillText('journaled on meguaz.com', W / 2, H - 110)
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'
+  ctx.font = '400 34px system-ui, sans-serif'
+  ctx.fillText('— ' + card.author, W / 2, H - 180)
+
+  // Body excerpt above the author line.
+  y = H - 260
+  if (card.body) {
+    ctx.font = '400 38px system-ui, sans-serif'
+    const lines = wrap(ctx, card.body, W - 200, 5).reverse()
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    for (const line of lines) {
+      ctx.fillText(line, W / 2, y)
+      y -= 56
+    }
+    y -= 30
+  }
+
+  // Title in the display face.
+  if (card.title) {
+    ctx.font = '400 72px ' + face + ', Georgia, serif'
+    const lines = wrap(ctx, card.title, W - 160, 2).reverse()
+    ctx.fillStyle = '#ffffff'
+    for (const line of lines) {
+      ctx.fillText(line, W / 2, y)
+      y -= 86
+    }
+    y -= 16
+  }
+
+  // Stars, then the city label above.
+  ctx.fillStyle = '#f0b45c'
+  ctx.font = '400 44px system-ui, sans-serif'
+  ctx.fillText('★'.repeat(Math.max(1, Math.min(5, card.rating))), W / 2, y)
+  y -= 74
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'
+  ctx.font = '400 34px system-ui, sans-serif'
+  ctx.fillText(card.city.toUpperCase(), W / 2, y)
+
+  const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', 0.92))
+  if (!blob) throw new Error('Could not render the card')
+  const file = new File([blob], 'meguaz-journal-' + card.code.toLowerCase() + '.jpg', {
+    type: 'image/jpeg',
+  })
+
+  if (navigator.canShare?.({ files: [file] })) {
+    await navigator.share({ files: [file], title: 'Meguaz — ' + card.city })
+    return 'shared'
+  }
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = file.name
+  a.click()
+  URL.revokeObjectURL(url)
+  return 'downloaded'
+}
+
 export async function shareStoryCard(card: StoryCard): Promise<'shared' | 'downloaded'> {
   await document.fonts.ready
   const canvas = document.createElement('canvas')

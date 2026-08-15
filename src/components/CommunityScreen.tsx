@@ -5,12 +5,15 @@ import { img } from '../data/media'
 import {
   searchCommunity,
   setFollowing,
+  submitReview,
   type CommunityFeedItem,
   type CommunityUser,
   type SessionUser,
 } from '../lib/api'
-import { DESTINATIONS } from '../data/destinations'
+import { DESTINATIONS, type Destination } from '../data/destinations'
+import { searchDestinations } from '../lib/search'
 import { sceneUrls } from '../data/scenes'
+import { shareJournalCard } from '../lib/shareCard'
 
 type Props = {
   user: SessionUser | null
@@ -74,8 +77,226 @@ function cityFor(code: string): string {
 
 /** A traveller's review as a postcard: the destination's scene sets the mood,
  * the stars and words carry the opinion. */
+/** Journal a trip straight from the community: pick where, rate it, write the
+    entry. Posting drops it into the feed instantly — and every entry can be
+    shared onward as a postcard. */
+function JournalComposer({
+  user,
+  onPosted,
+}: {
+  user: SessionUser | null
+  onPosted: (item: CommunityFeedItem) => void
+}) {
+  const [q, setQ] = useState('')
+  const [picked, setPicked] = useState<Destination | null>(null)
+  const [rating, setRating] = useState(5)
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [posting, setPosting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const matches = q.trim() && !picked ? searchDestinations(q, DESTINATIONS).slice(0, 5) : []
+
+  const post = async () => {
+    if (!picked || !body.trim() || posting) return
+    setPosting(true)
+    setError(null)
+    try {
+      await submitReview(picked.code, rating, title.trim() || undefined, body.trim())
+      onPosted({
+        id: 'local-' + Date.now(),
+        destinationCode: picked.code,
+        rating,
+        title: title.trim() || null,
+        body: body.trim(),
+        createdAt: new Date().toISOString(),
+        author: { name: user?.displayName || user?.email?.split('@')[0] || 'You', avatarUrl: null },
+      })
+      setPicked(null)
+      setQ('')
+      setTitle('')
+      setBody('')
+      setRating(5)
+    } catch {
+      setError('Could not post your entry — try again in a moment.')
+    } finally {
+      setPosting(false)
+    }
+  }
+
+  const FIELD: React.CSSProperties = {
+    border: '1px solid rgba(46,43,37,0.16)',
+    borderRadius: 12,
+    padding: '9px 12px',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    background: 'rgba(255,255,255,0.7)',
+    color: 'inherit',
+    minWidth: 0,
+    outline: 'none',
+  }
+
+  return (
+    <section className="glass grain" style={{ borderRadius: 22, padding: 16, marginBottom: 18 }}>
+      <h2 style={{ fontSize: 17, margin: '0 0 2px' }}>Journal a trip</h2>
+      <p style={{ fontSize: 12, color: 'var(--color-neutral-600)', margin: '0 0 12px' }}>
+        Where were you, how was it, what should the next traveller know? Every entry becomes a
+        postcard others can share.
+      </p>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ position: 'relative', flex: '1 1 190px' }}>
+          {picked ? (
+            <button
+              onClick={() => {
+                setPicked(null)
+                setQ('')
+              }}
+              style={{
+                ...FIELD,
+                width: '100%',
+                textAlign: 'left',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <Icon name="mapPin" size={14} color="var(--color-accent-700)" />
+              {picked.city} <span style={{ opacity: 0.5, fontWeight: 500 }}>· change</span>
+            </button>
+          ) : (
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Which city?"
+              aria-label="Destination"
+              style={{ ...FIELD, width: '100%' }}
+            />
+          )}
+          {matches.length > 0 && (
+            <div
+              className="popover"
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                left: 0,
+                right: 0,
+                zIndex: 40,
+                borderRadius: 14,
+                padding: 5,
+              }}
+            >
+              {matches.map((d) => (
+                <button
+                  key={d.code}
+                  onClick={() => setPicked(d)}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    border: 0,
+                    borderRadius: 10,
+                    padding: '8px 11px',
+                    background: 'transparent',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {d.city} <span style={{ opacity: 0.55 }}>· {d.country}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <span role="radiogroup" aria-label="Rating" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, padding: '0 4px' }}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              role="radio"
+              aria-checked={rating === n}
+              aria-label={n + ' stars'}
+              onClick={() => setRating(n)}
+              style={{
+                border: 0,
+                background: 'transparent',
+                fontSize: 22,
+                lineHeight: 1,
+                padding: 2,
+                cursor: 'pointer',
+                color: n <= rating ? '#e0a33c' : 'var(--color-neutral-400)',
+              }}
+            >
+              ★
+            </button>
+          ))}
+        </span>
+
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Give the trip a name (optional)"
+          aria-label="Entry title"
+          style={{ ...FIELD, flex: '1 1 220px' }}
+        />
+      </div>
+
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="Three days of cliff walks and the best seafood of my life. Skip the funicular queue — walk up, it's twenty minutes and the view…"
+        aria-label="Journal entry"
+        rows={3}
+        style={{ ...FIELD, width: '100%', marginTop: 8, resize: 'vertical', lineHeight: 1.55 }}
+      />
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+        {error && <span style={{ fontSize: 12, color: 'var(--color-accent-800)' }}>{error}</span>}
+        <button
+          className="hv-accent"
+          onClick={post}
+          disabled={!picked || !body.trim() || posting}
+          style={{
+            marginLeft: 'auto',
+            border: 0,
+            borderRadius: 999,
+            padding: '10px 22px',
+            background: 'var(--color-accent)',
+            color: 'var(--color-bg)',
+            fontFamily: 'var(--font-heading)',
+            fontSize: 14,
+            cursor: !picked || !body.trim() || posting ? 'default' : 'pointer',
+            opacity: !picked || !body.trim() || posting ? 0.55 : 1,
+          }}
+        >
+          {posting ? 'Posting…' : 'Post to the community'}
+        </button>
+      </div>
+    </section>
+  )
+}
+
 function FeedCard({ item }: { item: CommunityFeedItem }) {
   const [imgDead, setImgDead] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const share = async () => {
+    setSharing(true)
+    try {
+      await shareJournalCard({
+        code: item.destinationCode,
+        city: cityFor(item.destinationCode),
+        rating: item.rating,
+        title: item.title,
+        body: item.body,
+        author: item.author.name,
+      })
+    } catch {
+      /* dismissed the sheet */
+    } finally {
+      setSharing(false)
+    }
+  }
   const raw = sceneUrls(item.destinationCode)[1] ?? sceneUrls(item.destinationCode)[0] ?? null
   const scene = raw ? img(raw) : null
   return (
@@ -136,7 +357,30 @@ function FeedCard({ item }: { item: CommunityFeedItem }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
           <Avatar name={item.author.name} url={item.author.avatarUrl} size={26} />
           <span style={{ fontSize: 12, fontWeight: 700 }}>{item.author.name}</span>
-          <span style={{ fontSize: 11.5, color: 'var(--color-neutral-600)', marginLeft: 'auto' }}>
+          <button
+            onClick={share}
+            disabled={sharing}
+            aria-label="Share this postcard"
+            title="Share as a postcard"
+            style={{
+              marginLeft: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              border: '1px solid rgba(46,43,37,0.14)',
+              borderRadius: 999,
+              padding: '5px 11px',
+              background: 'rgba(255,255,255,0.6)',
+              fontSize: 11,
+              fontWeight: 700,
+              color: 'var(--color-text)',
+              cursor: sharing ? 'progress' : 'pointer',
+            }}
+          >
+            <Icon name="share" size={12} color="var(--color-accent-700)" />
+            {sharing ? '…' : 'Share'}
+          </button>
+          <span style={{ fontSize: 11.5, color: 'var(--color-neutral-600)' }}>
             {ago(item.createdAt)}
           </span>
         </div>
@@ -374,6 +618,11 @@ export default function CommunityScreen({ user, goAccount }: Props) {
               </div>
             </section>
           )}
+
+          <JournalComposer
+            user={user}
+            onPosted={(item) => setFeed((prev) => [item, ...prev])}
+          />
 
           {/* The pulse: latest reviews as destination postcards */}
           <section>
