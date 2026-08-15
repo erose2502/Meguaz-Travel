@@ -447,10 +447,19 @@ input[type='number'] {
   position: static;
 }
 
-@media (min-width: 760px) {
+@media (min-width: 700px) {
   .mg-side-sticky {
     position: sticky;
     top: 84px;
+    /* A sidebar taller than the viewport makes sticky look broken — it only
+       pins after you've scrolled its full height. Cap and scroll inside. */
+    max-height: calc(100vh - 96px);
+    max-height: calc(100dvh - 96px);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .mg-side-sticky::-webkit-scrollbar {
+    display: none;
   }
 }
 
