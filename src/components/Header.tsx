@@ -53,11 +53,21 @@ export default function Header({ screen, isWide, onNavigate, user, avatarUrl, on
       >
         <span
           style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
             fontFamily: 'var(--font-heading)',
             fontSize: 'clamp(20px,2.4vw,26px)',
             letterSpacing: '-0.02em',
           }}
         >
+          <img
+            src="/android-chrome-192x192.png"
+            alt=""
+            width={30}
+            height={30}
+            style={{ display: 'block' }}
+          />
           Meguaz
         </span>
 
