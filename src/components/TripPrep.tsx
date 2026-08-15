@@ -179,6 +179,135 @@ export default function TripPrep(props: Props) {
           )}
         </button>
       </div>
+
+      {/* ── Get trip-ready: digital arrives instantly, gear ships with an
+             order-by date derived from departure. When shipping can't make
+             it, the card says so and points at the airport alternative —
+             a deadline you can trust beats a store that pretends. ── */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, margin: '18px 0 10px' }}>
+        <h3 style={{ fontSize: 17, margin: 0 }}>Get trip-ready</h3>
+        <span style={{ fontSize: 11.5, color: 'var(--color-neutral-600)' }}>
+          digital instantly · gear in time for departure
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        {prepItems(dest, essentials, daysUntil ?? null).map((item) => (
+          <a
+            key={item.title}
+            href={item.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="glass-soft glass-lift"
+            style={{
+              flex: '1 1 215px',
+              minWidth: 200,
+              borderRadius: 18,
+              padding: '13px 15px',
+              textDecoration: 'none',
+              color: 'var(--color-text)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name={item.icon} size={16} color="var(--color-accent-700)" />
+              <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{item.title}</span>
+            </div>
+            <p style={{ fontSize: 11.5, color: 'var(--color-neutral-700)', margin: '6px 0 8px', lineHeight: 1.45 }}>
+              {item.note}
+            </p>
+            <span
+              className={item.urgent ? 'tag tag-accent' : 'tag tag-accent-2'}
+              style={{ fontSize: 10 }}
+            >
+              {item.timing}
+            </span>
+          </a>
+        ))}
+      </div>
     </div>
   )
+}
+
+type PrepItem = {
+  icon: IconName
+  title: string
+  note: string
+  timing: string
+  urgent: boolean
+  href: string
+}
+
+/** Shipping needs about this many days of runway before departure. */
+const SHIP_DAYS = 5
+
+function prepItems(
+  dest: Destination,
+  essentials: (typeof COUNTRY_ESSENTIALS)[string] | undefined,
+  daysUntil: number | null,
+): PrepItem[] {
+  const canShip = daysUntil == null || daysUntil >= SHIP_DAYS
+  const orderBy = (() => {
+    if (daysUntil == null || daysUntil < SHIP_DAYS) return null
+    const d = new Date()
+    d.setDate(d.getDate() + (daysUntil - SHIP_DAYS))
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  })()
+  const shipTiming = canShip
+    ? orderBy
+      ? 'Order by ' + orderBy + ' · home delivery'
+      : 'Ships in ~' + SHIP_DAYS + ' days'
+    : 'Too tight to ship — buy at the airport'
+
+  const items: PrepItem[] = [
+    {
+      icon: 'sparkle',
+      title: dest.country ? dest.country + ' eSIM' : 'Travel eSIM',
+      note: 'Data the moment you land — installs from an email in minutes, no store queue.',
+      timing: 'Instant · digital delivery',
+      urgent: false,
+      href: 'https://www.airalo.com/',
+    },
+    {
+      icon: 'shieldCheck',
+      title: 'Travel insurance',
+      note: 'Medical + trip cover, active from the day you fly. Digital certificate.',
+      timing: 'Instant · digital delivery',
+      urgent: false,
+      href: 'https://safetywing.com/nomad-insurance',
+    },
+  ]
+
+  if (essentials?.plugs) {
+    items.push({
+      icon: 'sparkle',
+      title: 'Power adapter · ' + essentials.plugs.split('·')[0].trim(),
+      note: dest.country + ' uses ' + essentials.plugs + ' — the one gadget people forget.',
+      timing: shipTiming,
+      urgent: !canShip,
+      href:
+        'https://www.amazon.com/s?k=' +
+        encodeURIComponent('travel power adapter ' + essentials.plugs.split('·')[0].trim()),
+    })
+  }
+
+  if (essentials && essentials.currencyCode !== 'USD') {
+    items.push({
+      icon: 'wallet',
+      title: essentials.currencyCode + ' cash, ready at the airport',
+      note: 'Reserve online at today’s rate, collect at your departure terminal.',
+      timing: 'Reserve online · airport pickup',
+      urgent: false,
+      href: 'https://www.travelex.com/',
+    })
+  }
+
+  items.push({
+    icon: 'ticket',
+    title: 'Packing upgrades',
+    note: 'Cubes, luggage scale, AirTag — the difference between packing and repacking.',
+    timing: shipTiming,
+    urgent: !canShip,
+    href: 'https://www.amazon.com/s?k=' + encodeURIComponent('packing cubes luggage scale travel'),
+  })
+
+  return items
 }
