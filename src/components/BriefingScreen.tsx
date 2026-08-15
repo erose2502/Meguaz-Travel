@@ -173,7 +173,7 @@ export default function BriefingScreen({
     const controller = new AbortController()
     setFood(null)
     setFoodLoading(true)
-    foodSuggestions(dest.city, dest.country, controller.signal)
+    foodSuggestions(dest.city, dest.country || dest.city, controller.signal)
       .then((r) => setFood(r.spots))
       .catch(() => setFood(null))
       .finally(() => {
@@ -296,7 +296,7 @@ export default function BriefingScreen({
           />
           <div style={{ flex: '1 1 200px' }}>
             <p style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(20px,2.2vw,26px)', margin: 0 }}>
-              {dest.city}, {dest.country}
+              {[dest.city, dest.country].filter(Boolean).join(', ')}
             </p>
             <p style={{ fontSize: 13, color: 'var(--color-neutral-700)', margin: '3px 0 0' }}>
               {liveHours !== null
@@ -345,7 +345,7 @@ export default function BriefingScreen({
       </h2>
       {!essentials && (
         <p style={{ fontSize: 13, color: 'var(--color-neutral-600)', margin: '0 0 12px' }}>
-          We have not written a verified briefing for {dest.country} yet — only facts we can stand behind get
+          We have not written a verified briefing for {dest.country || dest.city} yet — only facts we can stand behind get
           published here.
         </p>
       )}

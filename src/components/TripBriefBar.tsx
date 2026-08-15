@@ -270,7 +270,7 @@ export default function TripBriefBar(props: Props) {
             <input
               ref={inputRef}
               id="mg-dest"
-              value={focused ? query : dest ? dest.city + ', ' + dest.country : ''}
+              value={focused ? query : dest ? [dest.city, dest.country].filter(Boolean).join(', ') : ''}
               onChange={(e) => {
                 onQuery(e.target.value)
                 setOpen(true)
@@ -387,12 +387,21 @@ export default function TripBriefBar(props: Props) {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {row.note ?? row.dest.country + ' · ' + row.dest.code + ' · ' + formatDuration(row.dest.hrs)}
+                      {row.note ??
+                        [
+                          row.dest.country || 'Airport',
+                          row.dest.code,
+                          row.dest.hrs > 0 ? formatDuration(row.dest.hrs) : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                     </span>
                   </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-accent-700)' }}>
-                    ${row.dest.price}
-                  </span>
+                  {row.dest.price > 0 && (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-accent-700)' }}>
+                      ${row.dest.price}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

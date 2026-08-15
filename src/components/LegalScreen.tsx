@@ -84,7 +84,7 @@ const PRIVACY: Section[] = [
   {
     heading: '3. Who processes it',
     body: [
-      'Trip searches are fulfilled by partner APIs acting as processors: Duffel (flights and stays), Perplexity (ground transport research), OpenAI (chat and voice assistant), ElevenLabs (phrase pronunciation audio), LiveKit (voice transport), Mapbox and Google (geocoding and drive times), and SearchApi (hotel search). Only the data needed for each request is sent — for example a route and date, never your account profile.',
+      'Trip searches are fulfilled by partner APIs acting as processors: Duffel (flights and stays), Perplexity (ground transport research), OpenAI (chat assistant), ElevenLabs (phrase pronunciation audio), Mapbox and Google (geocoding and drive times), and SearchApi (hotel search). Only the data needed for each request is sent — for example a route and date, never your account profile.',
       'Hosting, authentication and the database are provided by Supabase. Error reports may be forwarded to a Sentry-compatible error tracking service.',
       'Because Meguaz plans international travel, searches necessarily flow to providers that may be outside your country. Providers are bound by their own data processing agreements.',
     ],

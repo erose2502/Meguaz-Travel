@@ -1,13 +1,9 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import BackdropReel from './components/BackdropReel'
 import Header from './components/Header'
 import Icon from './components/Icon'
 import MobileNav from './components/MobileNav'
-
-// LiveKit's client library is ~1MB; load it only when a call actually starts.
-const AgentCall = lazy(() => import('./components/AgentCall'))
-import type { AgentBrief } from './components/AgentCall'
 import HomeScreen from './components/HomeScreen'
 import PlansScreen from './components/PlansScreen'
 import PlannerScreen from './components/PlannerScreen'
@@ -24,7 +20,7 @@ import BookingSheet from './components/BookingSheet'
 import LegalScreen from './components/LegalScreen'
 import ConsentBanner from './components/ConsentBanner'
 import MusicDock from './components/MusicDock'
-import { DESTINATIONS } from './data/destinations'
+import { DESTINATIONS, type Destination } from './data/destinations'
 import { DEST_HERO_CLIPS } from './data/media'
 import { PHRASES, SPEECH_TAGS } from './data/phrases'
 import { sceneUrls } from './data/scenes'
@@ -32,6 +28,7 @@ import { searchDestinations } from './lib/search'
 import {
   createTrip,
   destinationGuideFor,
+  searchAirports,
   track,
   type BookingResult,
   type CabinClass,
@@ -45,7 +42,7 @@ import { useLiveLeaveBy, useTripPlan } from './lib/useTripPlan'
 import { useHomeCity } from './lib/useHomeCity'
 import { useAccount } from './lib/useAccount'
 import { useTrips } from './lib/useTrips'
-import type { CallState, Priority, Screen } from './types'
+import type { Priority, Screen } from './types'
 
 type AppProps = {
   defaultPriority?: Priority
@@ -126,7 +123,16 @@ export default function App({
   const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
   const [query, setQuery] = useState('')
   const [destCode, setDestCode] = useState<string | null>(SHARED?.code ?? null)
-  const [call, setCall] = useState<CallState>('idle')
+  // Destinations picked through the airport-search fallback rather than the
+  // curated index — persisted so saved trips and reloads still resolve them.
+  const [extraDests, setExtraDests] = useState<Record<string, Destination>>(() => {
+    if (typeof window === 'undefined') return {}
+    try {
+      return JSON.parse(localStorage.getItem('mg-extra-dests') || '{}')
+    } catch {
+      return {}
+    }
+  })
   const [shown, setShown] = useState<Record<string, boolean>>({})
   const [learned, setLearned] = useState<Record<string, boolean>>({})
 
@@ -162,15 +168,6 @@ export default function App({
   // Meta Pixel loads only when the server has an id configured (/api/config).
   useEffect(() => {
     void initPixel()
-  }, [])
-
-  // Pre-warm the ~1MB LiveKit chunk once the app is idle, so tapping "call"
-  // pays only the token mint + room join — not a cold bundle download.
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      void import('./components/AgentCall')
-    }, 5000)
-    return () => window.clearTimeout(t)
   }, [])
 
   // Motion: each screen's sections rise into place; the ambient blooms drift
@@ -224,14 +221,62 @@ export default function App({
     window.scrollTo(0, 0)
   }
 
-  // The call card owns the real LiveKit connection lifecycle; App only tracks
-  // whether the call surface is open.
-  const connectAgent = () => setCall('live')
-  const endCall = () => setCall('idle')
 
   const isMobile = width < mobileBreakpoint
-  const dest = destCode ? (DESTINATIONS.find((d) => d.code === destCode) ?? null) : null
-  const matches = useMemo(() => searchDestinations(query, DESTINATIONS), [query])
+  const dest = destCode
+    ? (DESTINATIONS.find((d) => d.code === destCode) ?? extraDests[destCode] ?? null)
+    : null
+
+  useEffect(() => {
+    localStorage.setItem('mg-extra-dests', JSON.stringify(extraDests))
+  }, [extraDests])
+
+  // The curated index is one gateway per country — it cannot cover domestic
+  // routes or second cities. Anything it misses falls through to the full
+  // airport search, so every commercial airport is a valid destination.
+  const [airportMatches, setAirportMatches] = useState<Destination[]>([])
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) {
+      setAirportMatches([])
+      return
+    }
+    const controller = new AbortController()
+    const t = window.setTimeout(() => {
+      searchAirports(q, null, controller.signal)
+        .then((r) =>
+          setAirportMatches(
+            r.airports.map((a) => ({
+              city: a.name,
+              country: '',
+              code: a.iata,
+              cc: '',
+              lang: '',
+              hrs: 0,
+              price: 0,
+            })),
+          ),
+        )
+        .catch(() => {})
+    }, 220)
+    return () => {
+      controller.abort()
+      window.clearTimeout(t)
+    }
+  }, [query])
+
+  const matches = useMemo(() => {
+    const local = searchDestinations(query, DESTINATIONS)
+    const seen = new Set(local.map((d) => d.code))
+    return [...local, ...airportMatches.filter((d) => !seen.has(d.code))].slice(0, 8)
+  }, [query, airportMatches])
+
+  const pickDest = (d: Destination) => {
+    if (!DESTINATIONS.some((x) => x.code === d.code)) {
+      setExtraDests((prev) => ({ ...prev, [d.code]: d }))
+    }
+    setDestCode(d.code)
+  }
   // Generated Seedream/Z-Image scenes, served from our own media dir — no
   // third-party image API at runtime.
   const scenes = dest ? sceneUrls(dest.code) : []
@@ -368,7 +413,7 @@ export default function App({
     setGuide(null)
     if (!dest) return
     const controller = new AbortController()
-    destinationGuideFor(dest.city, dest.country, controller.signal)
+    destinationGuideFor(dest.city, dest.country || dest.city, controller.signal)
       .then(setGuide)
       .catch(() => {
         /* generic facts and no attractions section — never an error state */
@@ -383,24 +428,6 @@ export default function App({
   const pickPlan = (code: string, planNights?: number) => {
     setDestCode(code)
     if (planNights) setNights(planNights)
-    go('planner')()
-  }
-
-  // The voice agent solved a trip: mirror the spoken brief into the planner
-  // so the traveller watches their plan build while the call continues.
-  const onAgentBrief = (b: AgentBrief) => {
-    const q = (b.to ?? '').trim()
-    if (!q) return
-    const match =
-      DESTINATIONS.find((d) => d.code === q.toUpperCase()) ?? searchDestinations(q, DESTINATIONS)[0]
-    if (!match) return
-    setDestCode(match.code)
-    if (b.arrive && /^\d{4}-\d{2}-\d{2}$/.test(b.arrive) && b.arrive > isoInDays(0)) {
-      setArriveBy(b.arrive)
-    }
-    if (b.nights) setNights(Math.min(90, Math.max(1, Math.round(b.nights))))
-    if (b.budget) setBudget(Math.min(100000, Math.max(50, Math.round(b.budget))))
-    if (b.adults) setAdults(Math.min(9, Math.max(1, Math.round(b.adults))))
     go('planner')()
   }
 
@@ -495,7 +522,6 @@ export default function App({
           screen={screen}
           isWide={!isMobile}
           onNavigate={(next) => go(next)()}
-          onConnectAgent={connectAgent}
           user={account.user}
           avatarUrl={account.profile?.avatar_url ?? null}
           onAccount={account.user ? go('profile') : go('account')}
@@ -515,7 +541,7 @@ export default function App({
               query={query}
               onQuery={setQuery}
               matches={matches}
-              onPick={(d) => setDestCode(d.code)}
+              onPick={pickDest}
               arriveBy={arriveBy}
               onArriveBy={setArriveBy}
               nights={nights}
@@ -788,15 +814,7 @@ export default function App({
           />
         )}
 
-        {dest && call === 'idle' && (
-          <MusicDock city={dest.city} country={dest.country} raised={isMobile} />
-        )}
-
-        {call !== 'idle' && (
-          <Suspense fallback={null}>
-            <AgentCall call={call} onEnd={endCall} onBrief={onAgentBrief} scene={scenes[0] ?? null} />
-          </Suspense>
-        )}
+        {dest && <MusicDock city={dest.city} country={dest.country} raised={isMobile} />}
 
         <ConsentBanner onPrivacy={go('privacy')} />
 

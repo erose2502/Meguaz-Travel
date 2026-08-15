@@ -6,7 +6,6 @@ type Props = {
   screen: Screen
   isWide: boolean
   onNavigate: (screen: Screen) => void
-  onConnectAgent: () => void
   user: SessionUser | null
   avatarUrl: string | null
   onAccount: () => void
@@ -19,7 +18,7 @@ const TABS: { id: Screen; label: string; icon: IconName }[] = [
   { id: 'profile', label: 'Profile', icon: 'user' },
 ]
 
-export default function Header({ screen, isWide, onNavigate, onConnectAgent, user, avatarUrl, onAccount }: Props) {
+export default function Header({ screen, isWide, onNavigate, user, avatarUrl, onAccount }: Props) {
   const initials = (user?.displayName || user?.email || '')
     .split(/[\s@.]+/)
     .filter(Boolean)
@@ -93,28 +92,6 @@ export default function Header({ screen, isWide, onNavigate, onConnectAgent, use
         )}
 
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            className="hv-white"
-            onClick={onConnectAgent}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '10px 16px',
-              border: '1px solid rgba(255,255,255,0.8)',
-              borderRadius: 999,
-              background: 'rgba(255,252,246,0.56)',
-              backdropFilter: 'blur(28px) saturate(170%)',
-              WebkitBackdropFilter: 'blur(28px) saturate(170%)',
-              fontFamily: 'var(--font-heading)',
-              fontSize: 14,
-              color: 'var(--color-text)',
-              cursor: 'pointer',
-            }}
-          >
-            <Icon name="headset" size={17} color="var(--color-accent-700)" />
-            {isWide && <span>Talk to an agent</span>}
-          </button>
           {user ? (
             <button
               onClick={onAccount}
